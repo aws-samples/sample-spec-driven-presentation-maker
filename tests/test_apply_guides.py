@@ -255,3 +255,32 @@ def test_a_source_language_selects_the_direction_guide(deck: SimpleNamespace) ->
     result = apply_guides(deck.path, source_language="en")
     assert result["writing"] == "en2ja"
     assert result["sources"]["writing"] == "unset-direction"
+
+
+@pytest.mark.parametrize("kind", ["structure", "writing"])
+@pytest.mark.parametrize("name", ["../secret", "sub/secret"])
+def test_a_traversing_guide_name_is_refused_and_copies_nothing(
+    deck: SimpleNamespace, tmp_path: Path, kind: str, name: str
+) -> None:
+    """A name is what gets copied into the deck, so one that walks out must not resolve."""
+    store = tmp_path / kind
+    (store / "sub").mkdir(exist_ok=True)
+    (store / "sub" / "secret.md").write_text("not a guide")
+    (tmp_path / "secret.md").write_text("not a guide")
+    assert (store / f"{name}.md").exists()  # keeps the case honest
+
+    result = apply_guides(deck.path, **{kind: name})
+    assert "error" in result
+    assert not (deck.path / "specs" / f"{kind}.md").exists()
+
+
+@pytest.mark.parametrize("kind", ["structure", "writing"])
+def test_an_absolute_guide_name_is_refused_and_copies_nothing(
+    deck: SimpleNamespace, tmp_path: Path, kind: str
+) -> None:
+    outside = tmp_path / "secret"
+    outside.with_suffix(".md").write_text("not a guide")
+
+    result = apply_guides(deck.path, **{kind: str(outside)})
+    assert "error" in result
+    assert not (deck.path / "specs" / f"{kind}.md").exists()

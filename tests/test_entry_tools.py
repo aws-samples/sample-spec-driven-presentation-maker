@@ -491,6 +491,19 @@ def test_apply_style_returns_the_same_shape_of_toc_for_the_guides(tmp_path: Path
     assert guide_toc("no headings here\n") == []
 
 
+@pytest.mark.parametrize("name", ["../secret", "sub/secret", "/etc/hosts"])
+def test_apply_style_refuses_a_guide_name_that_leaves_the_store(tmp_path: Path, name: str):
+    """apply_style and apply_guides share resolution, so neither may copy an outside file."""
+    deck_dir = tools.init_deck_workspace("deck")["output_dir"]
+    result = tools.apply_style(
+        deck_dir, style="newspaper", template="blank-light", structure=name
+    )
+
+    assert "error" in result
+    assert "Structure not found" in result["error"]
+    assert not (Path(deck_dir) / "specs" / "structure.md").exists()
+
+
 # ---------------------------------------------------------------------------
 # Size budget: the start_composing result reaches the composer inline
 # ---------------------------------------------------------------------------

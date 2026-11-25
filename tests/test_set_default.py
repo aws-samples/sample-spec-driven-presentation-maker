@@ -175,3 +175,15 @@ def test_an_unknown_kind_is_rejected(stores: SimpleNamespace) -> None:
     result = set_default("template", "blank-light")
     assert "kind must be one of" in result["error"]
     assert stores.read_state() == {}
+
+
+@pytest.mark.parametrize("kind", ["style", "structure", "writing"])
+@pytest.mark.parametrize("name", ["../secret", "sub/secret", "/etc/hosts"])
+def test_a_traversing_name_is_refused_and_saves_nothing(
+    stores: SimpleNamespace, kind: str, name: str
+) -> None:
+    """A stored default is resolved later, so a name that walks out must not be saved."""
+    scope = "ja" if kind == "writing" else ""
+    result = set_default(kind, name, scope=scope) if scope else set_default(kind, name)
+    assert "error" in result
+    assert stores.read_state() == {}

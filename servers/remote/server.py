@@ -1060,6 +1060,11 @@ def _resolve_guides(
     sources: dict[str, str] = {}
     notices: list[str] = []
     for kind, explicit in (("structure", structure), ("writing", writing)):
+        # The same boundary check apply_style already applies to `style`. resolve_default
+        # rejects a traversing name on its own; this keeps the remote's narrower S3 rule
+        # the one callers are held to, and names the offending argument in the error.
+        if explicit and not user_library.is_valid_style_name(explicit):
+            raise ValueError(f"Invalid {kind} name")
         bundled = _bundled_guide_dir(kind)
         name, origin, kind_notices = resolve_default(
             kind,

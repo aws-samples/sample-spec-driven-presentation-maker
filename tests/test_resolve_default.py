@@ -233,3 +233,73 @@ def test_a_direction_scope_is_built_from_both_tags() -> None:
     assert writing_scope("ja") == "ja"
     assert writing_scope("ja", "") == "ja"
     assert writing_scope("") == ""
+
+
+# ---------------------------------------------------------------------------
+# name validation: a name addresses a file directly inside the search directories
+# ---------------------------------------------------------------------------
+
+_SUFFIX = {"style": ".html", "structure": ".md", "writing": ".md"}
+
+
+@pytest.mark.parametrize("kind", ["style", "structure", "writing"])
+@pytest.mark.parametrize("name", ["../secret", "sub/secret"])
+def test_a_name_that_leaves_the_search_directory_resolves_to_nothing(
+    store: SimpleNamespace, kind: str, name: str
+) -> None:
+    """A traversing name must not reach a file the search directories do not hold.
+
+    Whatever the name addresses is what the caller copies into the deck, so the check
+    belongs to resolution rather than to each caller.
+    """
+    suffix = _SUFFIX[kind]
+    store.add(kind, "real", suffix)  # so the search directory itself exists
+    (store.config_dir / f"secret{suffix}").write_text("not a guide")
+    (store.config_dir / kind / "sub").mkdir(exist_ok=True)
+    (store.config_dir / kind / "sub" / f"secret{suffix}").write_text("not a guide")
+    # Without the check the probe below is what resolution would find and read. The
+    # assertion keeps the case honest: a missing intermediate directory would make the
+    # traversal fail for its own reasons and the test would prove nothing.
+    assert (store.dirs(kind)[0] / f"{name}{suffix}").exists()
+
+    resolved, origin, notices = resolve_default(kind, name, store.dirs(kind))
+    assert (resolved, origin, notices) == ("", "argument", [])
+
+
+@pytest.mark.parametrize("kind", ["style", "structure", "writing"])
+@pytest.mark.parametrize("name", [".", "..", "a/b", "a\\b", "C:name"])
+def test_a_name_that_is_not_one_path_component_resolves_to_nothing(
+    store: SimpleNamespace, kind: str, name: str
+) -> None:
+    store.add(kind, "real", _SUFFIX[kind])
+    resolved, origin, _ = resolve_default(kind, name, store.dirs(kind))
+    assert (resolved, origin) == ("", "argument")
+
+
+@pytest.mark.parametrize("kind", ["style", "structure", "writing"])
+def test_an_absolute_name_resolves_to_nothing(store: SimpleNamespace, kind: str) -> None:
+    suffix = _SUFFIX[kind]
+    store.add(kind, "real", suffix)
+    outside = store.config_dir / "secret"
+    outside.with_suffix(suffix).write_text("not a guide")
+    assert outside.with_suffix(suffix).exists()
+
+    resolved, origin, _ = resolve_default(kind, str(outside), store.dirs(kind))
+    assert (resolved, origin) == ("", "argument")
+
+
+def test_a_traversing_default_in_state_is_ignored(store: SimpleNamespace) -> None:
+    """A bad name already saved in state.json falls back instead of reading the file."""
+    store.add("structure", "real")
+    (store.config_dir / "secret.md").write_text("not a guide")
+    store.write_state(default_structure="../secret")
+
+    name, origin, _ = resolve_default("structure", "", store.dirs("structure"))
+    assert (name, origin) == ("by-audience", "default-missing")
+
+
+def test_a_non_ascii_name_still_resolves(store: SimpleNamespace) -> None:
+    """The check rejects separators and parents, not non-ASCII: a local store holds either."""
+    store.add("structure", "社内標準")
+    name, origin, _ = resolve_default("structure", "社内標準", store.dirs("structure"))
+    assert (name, origin) == ("社内標準", "argument")

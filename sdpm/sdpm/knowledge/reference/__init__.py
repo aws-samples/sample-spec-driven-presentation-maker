@@ -437,6 +437,13 @@ def is_valid_scope(scope: str) -> bool:
 
 
 def _exists_in(name: str, dirs: Iterable[Path], suffix: str) -> bool:
+    # The name must address a file directly inside one of the search directories.
+    # Checked here rather than at each caller so explicit arguments, the names kept in
+    # state.json and the ones derived from a language tag all go through it: without it
+    # "../../x" or an absolute path reaches any readable file and the caller copies it
+    # into the deck. See is_style_name for the rule.
+    if not is_style_name(name):
+        return False
     return any((d / f"{name}{suffix}").exists() for d in dirs)
 
 
