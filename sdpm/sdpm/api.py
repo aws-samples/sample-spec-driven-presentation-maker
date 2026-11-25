@@ -419,6 +419,59 @@ def fullwidth_font_notice(merged: dict[str, Any], style_html: str) -> list[str]:
     ]
 
 
+def template_font_notice(
+    merged: dict[str, Any],
+    previous_template: str,
+    template_analysis: dict[str, Any] | None,
+) -> list[str]:
+    """One notice when a deck moved to another template but kept the old one's faces.
+
+    ``merge_style_metadata`` fills a font field only while it is empty, so once filled
+    the fields stay as they are — which is what ``deck-json-spec`` promises and what
+    parallel composers build against. The cost lands when a deck moves to another
+    template: the previous template's faces stay, and the deck renders in a face the new
+    template's theme does not use, with nothing said about it.
+
+    Reported rather than overwritten, because a composer already holding these values
+    would find them changed under it, and because a face that differs may have been set
+    on purpose.
+
+    Only a template CHANGE is reported. A font that differs from the template the deck
+    was always on is a standing override, and saying so on every call would be noise.
+    """
+    if not template_analysis or not previous_template:
+        return []
+    now = str(merged.get("template") or "")
+    if _template_stem(previous_template) == _template_stem(now):
+        return []
+    declared = template_analysis.get("fonts") or {}
+    kept = merged.get("fonts") or {}
+    stale = [
+        (key, kept[key], declared[key])
+        for key in ("halfwidth", "fullwidth")
+        if kept.get(key) and declared.get(key) and kept[key] != declared[key]
+    ]
+    if not stale:
+        return []
+    fields = "; ".join(
+        f"fonts.{key} is {was!r} while the template declares {now_!r}"
+        for key, was, now_ in stale
+    )
+    return [
+        f"deck.json kept the fonts of template {_template_stem(previous_template)!r} "
+        f"after moving to {_template_stem(now)!r}: {fields}. A filled font field is "
+        f"never overwritten, so set it with run_python if the new template's face is "
+        f"the one you want."
+    ]
+
+
+def _template_stem(name: str) -> str:
+    """A template name without its extension, so ``x`` and ``x.pptx`` compare equal."""
+    from pathlib import PurePath
+
+    return PurePath(str(name).strip()).stem
+
+
 def missing_deck_fields(deck_json: dict[str, Any]) -> list[str]:
     """Return the still-empty fields defined by the deck.json skeleton."""
     from sdpm.engine.schema import DECK_JSON_SKELETON
@@ -636,6 +689,9 @@ def apply_style(
         sources["template"] = "argument"
     sources.update(origins)
     notices += fullwidth_font_notice(merged, style_html)
+    notices += template_font_notice(
+        merged, str(deck_data.get("template") or ""), template_analysis
+    )
     updated = _changed_style_fields(deck_data, merged)
     # A dropped key is not a changed value, so _changed_style_fields cannot see it.
     dropped_writing = "writing" in deck_data and "writing" not in merged

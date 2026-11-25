@@ -814,3 +814,83 @@ def test_a_regional_or_cased_tag_is_read_by_its_primary_subtag(deck_with_stores,
     deck_with_stores.write_state()
     result = apply_style(deck_with_stores.make_deck(language=tag), style="plain")
     assert len(_font_notices(result)) == 1, (tag, result["notices"])
+
+
+# ---------------------------------------------------------------------------
+# A deck that moved to another template keeps the previous template's faces,
+# because a filled font field is never overwritten
+# ---------------------------------------------------------------------------
+
+
+def _template_notices(result: dict) -> list[str]:
+    return [n for n in result["notices"] if "kept the fonts of template" in n]
+
+
+def test_moving_a_deck_to_another_template_reports_the_faces_it_kept() -> None:
+    from sdpm.api import template_font_notice
+
+    merged = {"template": "aws-brand-dark", "fonts": {"halfwidth": "Calibri",
+                                                      "fullwidth": "Meiryo"}}
+    analysis = {"fonts": {"halfwidth": "Amazon Ember", "fullwidth": "Meiryo"}}
+    notices = template_font_notice(merged, "blank-dark", analysis)
+    assert len(notices) == 1, notices
+    assert "'blank-dark'" in notices[0] and "'aws-brand-dark'" in notices[0]
+    assert "fonts.halfwidth is 'Calibri'" in notices[0]
+    assert "'Amazon Ember'" in notices[0]
+    assert "fullwidth" not in notices[0], "fullwidth agrees, so it is not reported"
+
+
+def test_a_deck_that_did_not_change_template_hears_nothing() -> None:
+    """A face differing from the template the deck was always on is a standing
+    override; saying so on every apply_style would be noise."""
+    from sdpm.api import template_font_notice
+
+    merged = {"template": "aws-brand-dark", "fonts": {"halfwidth": "Calibri"}}
+    analysis = {"fonts": {"halfwidth": "Amazon Ember"}}
+    assert template_font_notice(merged, "aws-brand-dark", analysis) == []
+    assert template_font_notice(merged, "aws-brand-dark.pptx", analysis) == [], "stem"
+
+
+def test_a_first_apply_style_hears_nothing_about_a_previous_template() -> None:
+    from sdpm.api import template_font_notice
+
+    merged = {"template": "aws-brand-dark", "fonts": {"halfwidth": "Amazon Ember"}}
+    analysis = {"fonts": {"halfwidth": "Amazon Ember"}}
+    assert template_font_notice(merged, "", analysis) == []
+
+
+def test_an_empty_font_field_is_not_reported_as_kept() -> None:
+    """Empty is merge_style_metadata's to fill, and fullwidth_font_notice's to report."""
+    from sdpm.api import template_font_notice
+
+    merged = {"template": "aws-brand-dark", "fonts": {"halfwidth": "", "fullwidth": ""}}
+    analysis = {"fonts": {"halfwidth": "Amazon Ember", "fullwidth": "Meiryo"}}
+    assert template_font_notice(merged, "blank-dark", analysis) == []
+
+
+def test_matching_faces_are_not_reported() -> None:
+    from sdpm.api import template_font_notice
+
+    merged = {"template": "b", "fonts": {"halfwidth": "Amazon Ember"}}
+    assert template_font_notice(merged, "a", {"fonts": {"halfwidth": "Amazon Ember"}}) == []
+
+
+def test_apply_style_reports_the_kept_faces_through_its_notices(deck_with_stores) -> None:
+    """The whole point is that the orchestrator reads this from apply_style, not from a
+    helper: a composer cannot edit deck.json and the caller is the only one who can.
+
+    Both bundled templates declare the same halfwidth face, so the deck carries a third
+    one here; what is under test is that a template change reaches the notice at all.
+    """
+    from sdpm.api import apply_style
+
+    deck_with_stores.write_state()
+    deck = deck_with_stores.make_deck(
+        language="ja", template="blank-dark",
+        fonts={"halfwidth": "Comic Sans MS", "fullwidth": "Meiryo"},
+    )
+    result = apply_style(deck, style="plain", template="blank-light")
+    kept = _template_notices(result)
+    assert len(kept) == 1, result["notices"]
+    assert "'blank-dark'" in kept[0] and "'blank-light'" in kept[0]
+    assert "fonts.halfwidth is 'Comic Sans MS'" in kept[0] and "'Calibri'" in kept[0]

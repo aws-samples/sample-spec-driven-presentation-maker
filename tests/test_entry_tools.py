@@ -795,3 +795,13 @@ def test_the_orchestrator_gates_the_review_section_on_that_setting() -> None:
     assert "When `review` is true" in review
     # And a deck built without one can still be reviewed on request.
     assert "built without one" in review
+
+
+def test_the_verify_guide_counts_a_typeface_as_a_form() -> None:
+    """A style may reserve a face for one role while a deck wants identifiers set apart
+    everywhere. Nothing measured catches the same identifier arriving in two faces, and
+    it is not a matter of taste, so the rule belongs here."""
+    verify = tools.read_guides(["verify"])["documents"][0]["content"]
+
+    assert "A typeface is a form" in verify
+    assert "two faces reads as two kinds of thing" in verify

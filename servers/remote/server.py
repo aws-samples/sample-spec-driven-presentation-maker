@@ -970,6 +970,7 @@ def apply_style(
         missing_deck_fields,
         style_field_sources,
         style_toc,
+        template_font_notice,
     )
 
     deck_data = _storage.get_deck_json(deck_id)
@@ -1018,7 +1019,11 @@ def apply_style(
             "updated": updated,
             "sources": sources,
             "missing": missing_deck_fields(merged),
-            "notices": resolved["notices"] + fullwidth_font_notice(merged, style_html),
+            "notices": resolved["notices"]
+            + fullwidth_font_notice(merged, style_html)
+            + template_font_notice(
+                merged, str(deck_data.get("template") or ""), template_analysis
+            ),
             "style_toc": style_toc(style_html),
             **resolved["tocs"],
         },

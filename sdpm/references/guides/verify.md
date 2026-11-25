@@ -17,6 +17,9 @@ follows is what neither reaches.
 
 - Things drawn in the same form must mean the same kind of thing. A form promises a
   sameness, and a reader believes the promise before reading the words.
+- A typeface is a form. One kind of thing takes one typeface across a deck; the same
+  identifier set in two faces reads as two kinds of thing. Where a style reserves a
+  typeface for one role, that role is the only thing it is for.
 - Things drawn differently must differ in meaning, and a legend or a heading must say
   how. A difference nobody explains reads as an accident.
 - Rows stacked above each other must correspond item by item where they are meant to

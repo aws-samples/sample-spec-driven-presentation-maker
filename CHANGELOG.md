@@ -66,7 +66,8 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   guide, reports findings and never edits. The orchestrator dispatches one reviewer per
   guide, in parallel, after the outline and after the slides are composed.
 - **A `verify` guide of the rules every deck owes**, which the composers read before writing
-  slide text and a reviewer holds the deck against: a form promises a sameness, rows that
+  slide text and a reviewer holds the deck against: a form promises a sameness, a typeface
+  is a form, rows that
   are meant to pair must pair, a title names what its slide holds, a line breaks where the
   reader pauses and only because the text does not fit, and the characters are the right
   ones. Unlike a style, a structure guide or
@@ -135,6 +136,18 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   carry emoji.
 
 ### Fixed
+
+- **A deck that moved to another template is told which faces it kept.** A font field is
+  filled from the template only while it is empty, so once filled it stays — which is
+  what `deck-json-spec` promises and what parallel composers build against. The cost
+  landed on a restyle: a deck first built on `blank-dark` and then moved to
+  `aws-brand-dark` kept `halfwidth: "Calibri"` while the new template declares
+  `Amazon Ember`, and nothing said so. `apply_style` now returns a notice naming the
+  previous template, the new one, and each field where the value kept differs from the
+  one the new template declares. It still does not overwrite: a composer already holding
+  these values would find them changed under it, and a face that differs may have been
+  set on purpose. Only a template change is reported, so a standing override on the
+  template a deck was always on stays quiet. Local mode and the AWS stack.
 
 - **A deck whose language is written with full-width characters is told when nothing
   filled the face for it.** `apply_style` fills `fonts` from the template, so a
