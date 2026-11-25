@@ -757,7 +757,9 @@ def test_emoji_in_slide_text_is_the_writing_guides_call() -> None:
 
     The cost a guide states must be true of the artifact: generate_pptx stores the
     character itself, so the delivered file carries it and the audience's own font
-    draws it. What may lack an emoji font is the host that renders the previews.
+    draws it. What may lack an emoji font is the host that renders the previews, and
+    that is a verification problem every deck has — so verify.md names the cost while
+    leaving the choice where it was.
     """
     references = Path(__file__).resolve().parents[1] / "sdpm" / "references"
 
@@ -767,6 +769,13 @@ def test_emoji_in_slide_text_is_the_writing_guides_call() -> None:
 
     design = (references / "guides/design-rules.md").read_text(encoding="utf-8")
     assert "writing guide" in design, "design-rules points at who owns the text rule"
+
+    # verify is what every composer reads whatever the deck's language, so the cost of the
+    # choice reaches a deck with no writing guide. It states the cost, not a prohibition.
+    verify = (references / "guides/verify.md").read_text(encoding="utf-8")
+    assert "emoji" in verify.lower()
+    assert "preview" in verify.lower(), "the cost is the preview, not the delivered file"
+    assert "writing guide" in verify, "verify must leave the choice with the writing guide"
 
     # A style's own sample slides are a different artifact, and a contract test enforces it.
     style = (references / "workflows/style.md").read_text(encoding="utf-8")

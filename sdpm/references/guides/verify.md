@@ -49,3 +49,8 @@ follows is what neither reaches.
 - You MUST look at the preview of every slide before calling it done, even when every
   check passed. Passing checks mean nothing was measured as wrong, not that the slide
   reads correctly.
+- An emoji in slide text defeats that look. The delivered file holds the character and the
+  reader's own font draws it, but the host that renders the preview may carry no emoji font
+  — the remote image carries none — so there it draws as a blank box and the slide cannot
+  be checked. An icon from `search_assets` can be, and takes the slide's colours. Whether
+  to use emoji at all belongs to the deck's writing guide; this is what it costs.
