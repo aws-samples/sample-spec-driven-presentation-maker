@@ -625,7 +625,9 @@ def apply_guides(
         deck_dir: Deck output directory path.
         structure: Structure guide name. "" uses the default; None leaves the deck's
             existing guide and deck.json key alone, for a caller restoring a deck whose
-            recorded guide is not on this machine.
+            recorded guide is not on this machine. None is deliberately not on the MCP
+            tool surface: an agent choosing it would be skipping a step whose consequence
+            it cannot see.
         writing: Writing guide name. "" uses the default, or the bundled guide for the
             deck's language; None leaves it alone. A guide that resolves to nothing has
             its copy removed.

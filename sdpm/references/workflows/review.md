@@ -36,6 +36,10 @@ Report findings as a list. Each one gives four things:
 Report no finding you cannot give evidence for. If the deck follows the guide, say so
 and say what you read — that is a useful result, not an empty one.
 
+**Constraints:**
+- You MUST report what you see and MUST NOT edit the deck, its specs or deck.json.
+- You MUST read every file in `target_paths` before reporting.
+
 ## When you are given facts
 
 `facts` are measurements, not findings. The machine reports what it counted and stops
@@ -61,7 +65,9 @@ Work from what the slide is trying to say.
   only for a language that separates words with spaces. For Japanese and other unspaced
   scripts the word count runs far below the limit however full the slide is: compare
   `visible_characters` against `density_sample_characters` instead, which is the same
-  count on the fullest slide the style itself draws.
+  count on the fullest slide the style itself draws. It is measured from the deck's own
+  `specs/art-direction.html`, so a hand-edited art direction is compared against its own
+  samples.
 - **Outside its region** is usually a defect: the region is where the style expects
   that content. A deliberate bleed is the exception, and it reads as deliberate only
   when the overflow is large and even. A `region: null` entry is worse than an

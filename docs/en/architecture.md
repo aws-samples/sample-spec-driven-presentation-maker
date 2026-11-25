@@ -435,7 +435,7 @@ names and descriptions, a "Previews could not be loaded" line, and a working **U
 | `start_translation` | Not bound: the translate workflow needs a checkout |
 | `set_default` | Not bound: it writes the user's own `state.json` |
 | `start_import_guide` | Not bound: it reads a path on the user's machine |
-| `apply_style` / `apply_guides` | Resolve only the bundled structure and writing guides |
+| `apply_style` / `apply_guides` | Bound, but resolve only the bundled structure and writing guides — a user's own live on their machine |
 
 ### Agent-Level Tools (Layer 4)
 

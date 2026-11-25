@@ -196,76 +196,6 @@ Layout:
 None of these paths exist by default — create only what you need
 (`mkdir -p ~/.config/sdpm/styles` etc.).
 
-## Custom Guides
-
-A style decides how a deck looks. Two more things decide how it reads, and both are yours
-to replace the same way:
-
-- **A structure guide** (`<user-config>/structure/<name>.md`) decides the deck's backbone —
-  what it says in what order — and is read before the outline is written.
-- **A writing guide** (`<user-config>/writing/<name>.md`) decides the wording of titles,
-  body, labels and notes, and is read before any slide text is written.
-
-Both are Markdown with a `description` line in the frontmatter, and hold rules and nothing
-else: the same document is read when writing and when reviewing. A guide of yours replaces
-the bundled one of that name outright — the two are never layered.
-
-```bash
-mkdir -p ~/.config/sdpm/writing
-cp sdpm/references/examples/writing/ja.md ~/.config/sdpm/writing/house-ja.md
-# then edit it, and make it the default for Japanese decks:
-#   set_default(kind="writing", name="house-ja", scope="ja")
-```
-
-Search order is the same as for styles: `$SDPM_STRUCTURES_DIR` / `$SDPM_WRITINGS_DIR`, then
-`<user-config>/structure/` or `/writing/`, then the bundled `sdpm/references/examples/`.
-`list_structures` and `list_writings` scan all three.
-
-A writing guide belongs to a language, so its default is set per scope: `ja` for a Japanese
-deck, or a direction like `en2ja` for one translated from English — translating is a
-different job from writing, because the source already chose what each slide claims. Set a
-scope you work in and `apply_style` uses it whenever the deck's `language` matches.
-
-`apply_style` copies the resolved guides into the deck as `specs/structure.md` and
-`specs/writing.md`, so a composer reads the deck's own copy. `apply_guides(deck_id)` writes
-just those two, for a deck that has no style name recorded or one that has just been
-translated; it never touches `specs/art-direction.html`.
-
-To bring in rules someone else wrote, `start_import_guide(<path>)` reads the document, sorts
-its rules by which guide each belongs to, saves what it can and reports what it dropped.
-
-One guide is not yours to replace: `verify`, the rules every deck owes whatever its style —
-that forms promise a sameness, that rows meant to pair do pair, that a line breaks where the
-reader pauses, that the characters are right. Those are not a matter of taste.
-
-### Layer 3 (Remote MCP)
-
-Upload the template to S3 and register it in DynamoDB:
-
-```bash
-uv run python scripts/upload_template.py \
-  --file my-template.pptx \
-  --name "Corporate 2026" \
-  --bucket <ResourceBucketName> \
-  --table <TableName>
-```
-
-| Parameter | Required | Description |
-|-----------|:--------:|-------------|
-| `--file` | ✅ | Path to the .pptx template file |
-| `--name` | ✅ | Display name for the template |
-| `--bucket` | ✅ | S3 bucket name (CDK output `ResourceBucketName`) |
-| `--table` | ✅ | Amazon DynamoDB table name (CDK output `TableName`) |
-
-The script handles S3 upload, template analysis, and Amazon DynamoDB metadata registration automatically.
-
-In the cloud Web UI, each user can add a private note to builtin and user templates from the Templates page. The agent considers these notes—including intended use cases, preferences, and default-use requests—when proposing or selecting a template.
-The local Web UI offers the same notes. Builtin-template notes are stored in
-`state.json` under `builtin_template_notes` (`~/.config/sdpm/state.json` on macOS/Linux,
-`%APPDATA%/sdpm/state.json` on Windows), where the CLI and the local MCP server read them too.
-
----
-
 ## Custom Styles
 
 A style is one HTML file that serves as rulebook, reference and gallery sample at once: its
@@ -449,6 +379,76 @@ When an asset name appears in multiple sources, the earlier source wins:
 This lets `extra_sources` override user-local sources, which in turn override
 bundled ones. Registering a built-in name in `extra_sources` is an intentional
 way to replace a bundled icon with your own.
+
+---
+
+## Custom Guides
+
+A style decides how a deck looks. Two more things decide how it reads, and both are yours
+to replace the same way:
+
+- **A structure guide** (`<user-config>/structure/<name>.md`) decides the deck's backbone —
+  what it says in what order — and is read before the outline is written.
+- **A writing guide** (`<user-config>/writing/<name>.md`) decides the wording of titles,
+  body, labels and notes, and is read before any slide text is written.
+
+Both are Markdown with a `description` line in the frontmatter, and hold rules and nothing
+else: the same document is read when writing and when reviewing. A guide of yours replaces
+the bundled one of that name outright — the two are never layered.
+
+```bash
+mkdir -p ~/.config/sdpm/writing
+cp sdpm/references/examples/writing/ja.md ~/.config/sdpm/writing/house-ja.md
+# then edit it, and make it the default for Japanese decks:
+#   set_default(kind="writing", name="house-ja", scope="ja")
+```
+
+Search order is the same as for styles: `$SDPM_STRUCTURES_DIR` / `$SDPM_WRITINGS_DIR`, then
+`<user-config>/structure/` or `/writing/`, then the bundled `sdpm/references/examples/`.
+`list_structures` and `list_writings` scan all three.
+
+A writing guide belongs to a language, so its default is set per scope: `ja` for a Japanese
+deck, or a direction like `en2ja` for one translated from English — translating is a
+different job from writing, because the source already chose what each slide claims. Set a
+scope you work in and `apply_style` uses it whenever the deck's `language` matches.
+
+`apply_style` copies the resolved guides into the deck as `specs/structure.md` and
+`specs/writing.md`, so a composer reads the deck's own copy. `apply_guides(deck_id)` writes
+just those two, for a deck that has no style name recorded or one that has just been
+translated; it never touches `specs/art-direction.html`.
+
+To bring in rules someone else wrote, `start_import_guide(<path>)` reads the document, sorts
+its rules by which guide each belongs to, saves what it can and reports what it dropped.
+
+One guide is not yours to replace: `verify`, the rules every deck owes whatever its style —
+that forms promise a sameness, that rows meant to pair do pair, that a line breaks where the
+reader pauses, that the characters are right. Those are not a matter of taste.
+
+### Layer 3 (Remote MCP)
+
+Upload the template to S3 and register it in DynamoDB:
+
+```bash
+uv run python scripts/upload_template.py \
+  --file my-template.pptx \
+  --name "Corporate 2026" \
+  --bucket <ResourceBucketName> \
+  --table <TableName>
+```
+
+| Parameter | Required | Description |
+|-----------|:--------:|-------------|
+| `--file` | ✅ | Path to the .pptx template file |
+| `--name` | ✅ | Display name for the template |
+| `--bucket` | ✅ | S3 bucket name (CDK output `ResourceBucketName`) |
+| `--table` | ✅ | Amazon DynamoDB table name (CDK output `TableName`) |
+
+The script handles S3 upload, template analysis, and Amazon DynamoDB metadata registration automatically.
+
+In the cloud Web UI, each user can add a private note to builtin and user templates from the Templates page. The agent considers these notes—including intended use cases, preferences, and default-use requests—when proposing or selecting a template.
+The local Web UI offers the same notes. Builtin-template notes are stored in
+`state.json` under `builtin_template_notes` (`~/.config/sdpm/state.json` on macOS/Linux,
+`%APPDATA%/sdpm/state.json` on Windows), where the CLI and the local MCP server read them too.
 
 ---
 
