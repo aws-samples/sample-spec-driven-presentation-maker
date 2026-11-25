@@ -691,3 +691,37 @@ def test_start_import_guide_needs_a_file_the_user_named(tmp_path: Path) -> None:
     assert "Not a file" in result["error"]
 
     assert "Not a file" in tools.start_import_guide(str(tmp_path))["error"], "a directory is not a source"
+
+
+# ---------------------------------------------------------------------------
+# verify.md: universal rules, read when writing as well as when reviewing
+# ---------------------------------------------------------------------------
+
+
+def test_the_verify_guide_holds_rules_and_not_review_mechanics() -> None:
+    """REQ-2.4 applies to this guide too: a document a composer reads before writing
+    must not carry instructions for a reviewer reading measured facts."""
+    verify = tools.read_guides(["verify"])["documents"][0]["content"]
+
+    assert "same form" in verify and "right ones" in verify, "the rules are here"
+    assert "start_reviewing" not in verify
+    assert "visible_characters" not in verify, "the facts table belongs to the review role"
+    assert "MUST NOT edit" not in verify, "who may edit is the reviewer's role, not a rule"
+
+
+def test_the_review_role_holds_the_facts_and_how_to_read_them() -> None:
+    result = tools.start_reviewing(
+        tools.init_deck_workspace("mech")["output_dir"], guide="verify", target="outline"
+    )
+    workflow = result["static"]["workflow"]
+    assert "visible_characters" in workflow and "density_limit" in workflow
+    assert "never edit" in workflow
+
+
+def test_both_composers_read_the_universal_rules_before_writing_text() -> None:
+    """Without this the rules reach nobody until review, and a finding costs a redispatch."""
+    workflows = Path(__file__).resolve().parents[1] / "sdpm" / "references" / "workflows"
+    for mode in ("composer", "composer-html"):
+        doc = (workflows / f"{mode}.md").read_text(encoding="utf-8")
+        assert 'read_guides(["verify"])' in doc, mode
+        assert "specs/writing.md" in doc, mode

@@ -113,9 +113,11 @@ target: {outline|slides}
 With the outline written, dispatch a reviewer against the structure guide. Once the slides
 are composed, dispatch reviewers against the writing guide, the style and `verify` in
 parallel — each holds the deck against its own guide, and what to look for is in that guide,
-not here. If your environment has no sub-agent mechanism at all, hold the deck against each
-guide yourself: call `start_reviewing` with the same values and follow the document it
-returns, then come back here.
+not here. `verify` is the one guide a user cannot replace: it holds the rules every deck
+owes, which the composers also read before writing text. If your environment has no
+sub-agent mechanism at all, hold the deck against each guide yourself: call
+`start_reviewing` with the same values and follow the document it returns, then come back
+here.
 
 Reviewers report; they never edit. You decide which findings to act on and dispatch a
 composer for each slug that needs changing, with an instruction describing what to fix. A
