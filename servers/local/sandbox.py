@@ -109,7 +109,7 @@ def make_runner(deck_id: str) -> str:
 
 _RUNNER_STYLE = '''\
 import json, os, sys, re
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 user_styles_dir = Path(sys.argv[1]).resolve()
 styles_dirs = json.loads(sys.argv[2])
@@ -119,7 +119,10 @@ bundled_guide_names = json.loads(sys.argv[4])
 _GUIDE_KINDS = ("structure", "writing")
 
 def _validate_name(name, what="style"):
-    if not name or "/" in name or "\\\\" in name or ".." in name:
+    # One path component, the same rule as sdpm.knowledge.reference.is_style_name, so a
+    # name never walks out of the directory it is written into. PureWindowsPath catches a
+    # drive prefix too ("D:x"), which separator and ".." checks alone let through.
+    if not name or name in (".", "..") or "\\x00" in name or PureWindowsPath(name).name != name:
         raise PermissionError(f"Invalid {what} name: {name}")
     return name
 

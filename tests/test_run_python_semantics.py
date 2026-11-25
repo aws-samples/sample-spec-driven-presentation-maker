@@ -1087,8 +1087,10 @@ class TestWriteGuide:
         assert "kind must be one of" in result["output"]
         assert not list((tmp_path / "sdpm").glob("*/*.md"))
 
-    @pytest.mark.parametrize("name", ["../escape", "sub/dir", "..", "", "a\\\\b"])
+    @pytest.mark.parametrize("name", ["../escape", "sub/dir", "..", "", "a\\\\b", ".", "D:x"])
     def test_it_refuses_a_name_that_leaves_the_store(self, name: str, monkeypatch, tmp_path: Path):
+        """``D:x`` is why the rule is PureWindowsPath rather than a separator check: on
+        Windows ``dest_dir / "D:x.md"`` resolves against that drive and leaves the store."""
         result = self._run(f'write_guide("writing", "{name}", "y")', monkeypatch, tmp_path)
         assert "Invalid writing name" in result["output"], result["output"]
         assert not list(tmp_path.rglob("*.md"))
