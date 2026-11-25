@@ -89,6 +89,13 @@ See [Architecture](docs/en/architecture.md).
   per mode (composer: `composer.md` / `composer-html.md`, chosen by the spawner via
   `start_composing`'s `mode` argument); `SKILL.md`, the ACP agent definitions and server
   instructions are dispatch/environment only
+- A guide holds rules and nothing else, and the same document is read when writing and when
+  reviewing: no "what to look for" section, and the rejection condition goes inside the rule.
+  `references/examples/` is what a user replaces (styles, structure, writing — a user's file
+  shadows the bundled one of that name outright, never layered); `references/guides/` is what
+  they do not. A rule that is a matter of taste belongs in the former, one that is not in the
+  latter — `guides/verify.md` is the universal set, and the composers read it before writing
+  slide text
 - Client configuration is generated, never hand-written: one template in
   `servers/local/client_config.py` (absolute `uv` + absolute checkout, no launcher, no
   `PATH`), rendered per client; `tests/test_client_config.py` guards it. Both launchers

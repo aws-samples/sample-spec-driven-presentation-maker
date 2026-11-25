@@ -13,7 +13,63 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ## [Unreleased]
 
+### Upgrading to this version
+
+**Local installs (`sdpm update`).**
+
+- The `writing-ja` guide is gone. Its rules now live in `references/examples/writing/ja.md`,
+  which a deck gets as `specs/writing.md` when a style or the guides are applied, so a
+  composer reads the deck's own copy instead of a bundled guide. Nothing to do unless you
+  referenced `read_guides(["writing-ja"])` from your own prompts; point them at
+  `specs/writing.md` instead.
+- Set `language` in `deck.json` before `apply_style`, not after the outline. The writing
+  guide is resolved from it, so a deck with no language gets none; `apply_style` says so in
+  its `notices`. The orchestrator workflow does this already.
+- If you set a default writing guide by hand in `~/.config/sdpm/state.json`,
+  `default_writing` is now a table keyed by scope rather than one name:
+  `{"ja": "house-ja", "en2ja": "house-en2ja"}`. A plain string is ignored. `set_default`
+  writes it for you.
+
 ### Added
+
+- **Structure and writing guides are resource types you can replace** (`list_structures`,
+  `list_writings`, `apply_guides`, `set_default`). A deck's quality has four parts —
+  what it says in what order, how it is worded, how it looks, and whether its forms match
+  its meaning. Only the look was yours to change. Now the first two are too: put a guide in
+  `~/.config/sdpm/structure/` or `~/.config/sdpm/writing/` (or point `SDPM_STRUCTURES_DIR` /
+  `SDPM_WRITINGS_DIR` at one) and it shadows the bundled default of that name, the same way
+  a style does. `apply_style` copies the resolved guides into the deck as
+  `specs/structure.md` and `specs/writing.md`, and records all three names in `deck.json`;
+  `apply_guides` writes just the guides, for a deck that has no style name to resolve or one
+  that has just been translated. `set_default(kind, name, scope)` states a standing choice.
+  Bundled: `structure/by-audience` (choosing a backbone from the audience and the time),
+  `writing/ja` (Japanese slide wording) and `writing/en2ja` (translating English into
+  Japanese — a different job, since the source already chose the claim). Local mode and the
+  AWS stack.
+- **A writing guide belongs to a language, or to a translation direction.** `default_writing`
+  is keyed by scope: `ja` for a Japanese deck, `en2ja` for one translated from English.
+  Resolution tries the direction first, then the language, taking your own guide before the
+  bundled one. Translation re-resolves the derived deck's guide for its new direction, so an
+  English sibling stops carrying the Japanese rules.
+- **Review is a role you can dispatch** (`start_reviewing(deck_id, guide, target)`). It
+  returns the review role document, the guide to hold the deck against, the files to read,
+  and — for `verify` on slides — measured facts about each slide: visible words and
+  characters against the style's declared density and its own samples, elements outside or
+  outside of every region, regions sharing a name prefix at different sizes, how many
+  regions each row holds, and strings that repeat. The facts carry no verdict, because
+  whether one is a defect depends on what the slide means; the reviewer decides against the
+  guide, reports findings and never edits. The orchestrator dispatches one reviewer per
+  guide, in parallel, after the outline and after the slides are composed.
+- **A `verify` guide of the rules every deck owes**, which the composers read before writing
+  slide text and a reviewer holds the deck against: a form promises a sameness, rows that
+  are meant to pair must pair, a title names what its slide holds, a line breaks where the
+  reader pauses, and the characters are the right ones. Unlike a style, a structure guide or
+  a writing guide, it is not a matter of taste and cannot be replaced.
+- **Importing someone else's slide rules** (`start_import_guide(source_path)`). The role
+  reads the document you name, sorts each rule by which guide it belongs to — design, a
+  translation direction, wording, or structure — saves the ones it can with `write_guide`,
+  and reports what it dropped and why. Code shipped alongside is summarised, never saved or
+  run.
 
 - **Speaker notes destination** (`deck.json` `"speakerNotes"`, #666). `"pptx"` (the
   default, unchanged behaviour) writes each slide's `notes` as speaker notes; `"markdown"`
@@ -54,6 +110,23 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   (AGENTS.md, steering) get a table of their own, and the report lists what it does not
   measure. CI writes the table, with +/- against the base commit, to the `python` job
   summary. Report only; nothing fails on size. Development only.
+
+### Removed
+
+- **The `writing-ja` guide** (`references/guides/writing-ja.md`). Its rules are the bundled
+  `references/examples/writing/ja.md`, which a deck carries as `specs/writing.md`. See
+  Upgrading above.
+- **The `design-review-guide` guide.** No role document referenced it, and its content
+  split: overflow, overlap and clipped text are already measured, and "is it easy to
+  understand" belongs to the structure guide.
+
+### Changed
+
+- **Emoji in slide text is the writing guide's call.** Four documents you cannot replace
+  prohibited it outright, which would have overruled a writing guide of your own. The
+  bundled guides still say not to, and say why (the PPTX renderer has no emoji font), so
+  replacing one is a choice you make knowingly. A style's own sample slides still may not
+  carry emoji.
 
 ### Fixed
 

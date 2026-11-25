@@ -80,7 +80,7 @@ Key capabilities:
 A thin bind of the `sdpm.tools` contract. Runs as a stdio server (plus an ACP variant for the local Web UI).
 
 - Registers the contract tools on the MCP SDK's `MCPServer` — no tool logic of its own
-- **Role entry tools `start_presentation` / `start_composing` / `start_style` / `start_translation`** — any MCP client (including ones with no skill/sub-agent mechanism, e.g. Claude Desktop) gets the role document as a tool response, together with what that role reads first (style/template catalogues; the deck's specs and assigned slides; a base style). The entry is carried by the tool surface itself, so nothing depends on skills, agent definitions or MCP Server Instructions (`SDPM_DISABLE_INSTRUCTIONS=1` turns the latter off).
+- **Role entry tools `start_presentation` / `start_composing` / `start_style` / `start_translation` / `start_reviewing` / `start_import_guide`** — any MCP client (including ones with no skill/sub-agent mechanism, e.g. Claude Desktop) gets the role document as a tool response, together with what that role reads first (style/template catalogues; the deck's specs and assigned slides; a base style). The entry is carried by the tool surface itself, so nothing depends on skills, agent definitions or MCP Server Instructions (`SDPM_DISABLE_INSTRUCTIONS=1` turns the latter off).
 - No AWS required — all files stored locally
 
 ---
@@ -103,6 +103,10 @@ Differences from Layer 2:
 - `run_python` — runs in an Amazon Bedrock AgentCore Code Interpreter sandbox instead of a local process
 - `search_slides` — semantic slide search through an Amazon Bedrock Knowledge Base, registered only when one is configured
 - `start_translation` is not bound: the translate workflow runs scripts from a checkout
+- `set_default` and `start_import_guide` are not bound: both work on the user's own config
+  directory, which the cloud stack has no equivalent of
+- `apply_style` / `apply_guides` resolve only the bundled structure and writing guides; a
+  user's own guides live on their machine and are not synced to S3
 
 HTML decks (`deck.json` `outputFormat: "html"`) use the same tools with these differences:
 
@@ -381,8 +385,8 @@ To add custom roles (e.g., team-based access), modify the `resolve_role` functio
 | Category | Tool | Description |
 |----------|------|-------------|
 | Prompts | `sdpm-vibe`, `sdpm-spec`, `sdpm-style`, `sdpm-translate` | User-invoked (slash-command) entry points; `vibe` / `spec` set the interaction mode |
-| Entry | `start_presentation`, `start_composing`, `start_style`, `start_translation` | Role document + what the role reads first (orchestrator, composer, style, translate). `start_composing(mode="pptx"\|"html")` picks the composer document for the deck's output format |
-| Workflow | `init_deck_workspace`, `check_specs`, `apply_style`, `analyze_template`, `show_deck` | Create deck workspace (`output_format="pptx"\|"html"`), validate specs, apply style, analyze template. In MCP Apps clients `check_specs` also shows the deck viewer on its Outline tab with the check results, and `show_deck` (listed to MCP Apps clients only) shows it on the Slides tab. The local stdio server adds `note_for_user`, a sentence for the user that names `sdpm open <deck>`, to the `init_deck_workspace` result when the Web UI is installed and the client did not declare MCP Apps |
+| Entry | `start_presentation`, `start_composing`, `start_style`, `start_translation`, `start_reviewing`, `start_import_guide` | Role document + what the role reads first (orchestrator, composer, style, translate, review, import-guide). `start_composing(mode="pptx"\|"html")` picks the composer document for the deck's output format; `start_reviewing(deck_id, guide, target)` holds a deck against one guide and, for `verify` on slides, carries the measured facts |
+| Workflow | `init_deck_workspace`, `check_specs`, `apply_style`, `apply_guides`, `list_structures`, `list_writings`, `set_default`, `analyze_template`, `show_deck` | Create deck workspace (`output_format="pptx"\|"html"`), validate specs, apply style, analyze template. In MCP Apps clients `check_specs` also shows the deck viewer on its Outline tab with the check results, and `show_deck` (listed to MCP Apps clients only) shows it on the Slides tab. The local stdio server adds `note_for_user`, a sentence for the user that names `sdpm open <deck>`, to the `init_deck_workspace` result when the Web UI is installed and the client did not declare MCP Apps |
 | Generation | `generate_pptx` | Generate PPTX (local `generate_pptx` refuses HTML decks; `run_python` builds them). Carries `note_for_user` under the same conditions |
 | Attachments | `read_attachment`, `import_attachment` | Read an attached file (PDF, DOCX, XLSX, PPTX, text, images) with byte-offset paging; import it into the deck workspace |
 | Sandbox | `run_python`, `run_style_python` | Run Python against the deck workspace in a local process (edits, measuring, previews returned as `preview_files`); the style variant for the style workflow |
@@ -429,6 +433,9 @@ names and descriptions, a "Previews could not be loaded" line, and a working **U
 | `run_python` | Runs in an Amazon Bedrock AgentCore Code Interpreter sandbox |
 | `search_slides` | Semantic slide search; registered only when an Amazon Bedrock Knowledge Base is configured |
 | `start_translation` | Not bound: the translate workflow needs a checkout |
+| `set_default` | Not bound: it writes the user's own `state.json` |
+| `start_import_guide` | Not bound: it reads a path on the user's machine |
+| `apply_style` / `apply_guides` | Resolve only the bundled structure and writing guides |
 
 ### Agent-Level Tools (Layer 4)
 
