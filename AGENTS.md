@@ -96,6 +96,12 @@ See [Architecture](docs/en/architecture.md).
   they do not. A rule that is a matter of taste belongs in the former, one that is not in the
   latter — `guides/verify.md` is the universal set, and the composers read it before writing
   slide text
+- Keeping a guide honest: when a check starts covering one of its rules, delete that rule.
+  A rule kept after a check covers it costs every reader's attention and earns nothing.
+  Never copy a check's implementation into a guide — no thresholds, no function names: the
+  check is the source of truth for how it works and a copy would drift from it silently.
+  How a reviewer reads the measured facts belongs to the review role document. This is
+  contributor guidance, so it lives here rather than inside a guide every composer loads
 - Client configuration is generated, never hand-written: one template in
   `servers/local/client_config.py` (absolute `uv` + absolute checkout, no launcher, no
   `PATH`), rendered per client; `tests/test_client_config.py` guards it. Both launchers

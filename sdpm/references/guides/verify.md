@@ -53,12 +53,3 @@ follows is what neither reaches.
 - You MUST look at the preview of every slide before calling it done, even when every
   check passed. Passing checks mean nothing was measured as wrong, not that the slide
   reads correctly.
-
-## Keeping this guide honest
-
-When a check starts covering one of the rules above, delete that rule from this guide. A
-rule kept after a check covers it costs a reader's attention and earns nothing.
-
-Do not copy a check's implementation into this guide — no thresholds, no function names.
-The check is the source of truth for how it works, and a copy here would drift from it
-silently. How a reviewer reads the measured facts is in the review role document.
