@@ -68,7 +68,8 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 - **A `verify` guide of the rules every deck owes**, which the composers read before writing
   slide text and a reviewer holds the deck against: a form promises a sameness, rows that
   are meant to pair must pair, a title names what its slide holds, a line breaks where the
-  reader pauses, and the characters are the right ones. Unlike a style, a structure guide or
+  reader pauses and only because the text does not fit, and the characters are the right
+  ones. Unlike a style, a structure guide or
   a writing guide, it is not a matter of taste and cannot be replaced.
 - **Importing someone else's slide rules** (`start_import_guide(source_path)`). The role
   reads the document you name, sorts each rule by which guide it belongs to — design, a
@@ -134,6 +135,18 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   carry emoji.
 
 ### Fixed
+
+- **A deck whose language is written with full-width characters is told when nothing
+  filled the face for it.** `apply_style` fills `fonts` from the template, so a
+  Latin-only template leaves `fonts.fullwidth` empty — the one field that decides which
+  face renders CJK text. The deck's `language` already says it needs one, and the build
+  fell back without a word. `apply_style` now returns a notice naming the empty field,
+  the language, and the faces the style's own `--font-family` declares, so the value is
+  set with `run_python` from the style's preference instead of guessed. It does not
+  choose for you: not every family a style names is full-width capable, and which of
+  them a reader has installed is not knowable where the deck is built. `apply_guides`
+  is unaffected — it writes guides and never touches fonts. Local mode and the AWS
+  stack.
 
 - **Built PPTX decks carry a document title and language.** The PPTX title (`dc:title`)
   came from `deck.json` `title`, or, without one, from the first slide's title placeholder.

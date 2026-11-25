@@ -328,6 +328,97 @@ def style_field_sources(merged: dict[str, Any]) -> dict[str, str]:
     return merged.pop("_sources", {})
 
 
+#: Primary language subtags whose text is written with full-width characters, so a deck
+#: in one of them renders through ``fonts.fullwidth`` rather than ``fonts.halfwidth``.
+#: A fact about languages, not a list of fonts: which face to use stays the caller's.
+_FULLWIDTH_LANGUAGE_SUBTAGS = frozenset({"ja", "zh", "ko", "yue"})
+
+#: CSS keywords a ``font-family`` stack may end on. They name no face, so quoting one
+#: back to the caller as the style's preference would be noise.
+_CSS_GENERIC_FAMILIES = frozenset(
+    {
+        "serif",
+        "sans-serif",
+        "monospace",
+        "cursive",
+        "fantasy",
+        "system-ui",
+        "ui-serif",
+        "ui-sans-serif",
+        "ui-monospace",
+        "ui-rounded",
+        "math",
+        "emoji",
+        "fangsong",
+        "inherit",
+        "initial",
+        "revert",
+        "unset",
+    }
+)
+
+
+def _needs_fullwidth_font(language: str) -> bool:
+    """True when a deck in ``language`` renders its text through ``fonts.fullwidth``.
+
+    The primary subtag decides it, so ``ja-JP`` and ``zh-Hant`` answer as ``ja`` and
+    ``zh`` do.
+    """
+    return (language or "").strip().lower().partition("-")[0] in _FULLWIDTH_LANGUAGE_SUBTAGS
+
+
+def _style_font_families(html_text: str) -> list[str]:
+    """The faces a style's ``--font-family`` names, in its own order, generics dropped."""
+    import re
+
+    root = re.search(r":root\s*\{(?P<body>.*?)\}", html_text, re.DOTALL | re.IGNORECASE)
+    if not root:
+        return []
+    decl = re.search(
+        r"--font-family\s*:\s*(?P<value>[^;}]+)", root.group("body"), re.IGNORECASE
+    )
+    if not decl:
+        return []
+    families = []
+    for raw in decl.group("value").split(","):
+        name = raw.strip().strip("\"'").strip()
+        if name and name.lower() not in _CSS_GENERIC_FAMILIES:
+            families.append(name)
+    return families
+
+
+def fullwidth_font_notice(merged: dict[str, Any], style_html: str) -> list[str]:
+    """One notice when a deck writes full-width text and nothing filled the face for it.
+
+    ``fonts.fullwidth`` is what decides which face renders CJK text, and on this path
+    nothing can reach it: ``merge_style_metadata`` fills fonts from the template, and a
+    Latin-only template carries none. The style does name its faces, but in
+    ``--font-family``, a CSS stack the build never reads. So the deck ends up knowing it
+    is Japanese while the one field that makes Japanese render stays empty, silently.
+
+    The notice says so rather than choosing, because the families a style names are not
+    all full-width capable and which of them a reader has installed is not knowable
+    here. Quoting the stack gives the caller the style's own preference to set with
+    ``run_python``.
+    """
+    language = str(merged.get("language", "")).strip()
+    if not _needs_fullwidth_font(language):
+        return []
+    if (merged.get("fonts") or {}).get("fullwidth"):
+        return []
+    families = _style_font_families(style_html)
+    preference = (
+        f" The style's --font-family names {', '.join(families)}."
+        if families
+        else " The style names no font family of its own."
+    )
+    return [
+        f"deck.json fonts.fullwidth is empty and language is {language!r}: nothing "
+        f"supplied a full-width face, so the build falls back and the text may not "
+        f"render as the style intends. Set it with run_python.{preference}"
+    ]
+
+
 def missing_deck_fields(deck_json: dict[str, Any]) -> list[str]:
     """Return the still-empty fields defined by the deck.json skeleton."""
     from sdpm.engine.schema import DECK_JSON_SKELETON
@@ -527,8 +618,9 @@ def apply_style(
         template_path, _ = _resolve_template(completed, deck_path, get_templates_dirs())
         template_analysis = _analyze(template_path)
 
+    style_html = src.read_text(encoding="utf-8")
     merged = merge_style_metadata(
-        src.read_text(encoding="utf-8"),
+        style_html,
         template_analysis,
         completed,
     )
@@ -543,6 +635,7 @@ def apply_style(
     if template:
         sources["template"] = "argument"
     sources.update(origins)
+    notices += fullwidth_font_notice(merged, style_html)
     updated = _changed_style_fields(deck_data, merged)
     # A dropped key is not a changed value, so _changed_style_fields cannot see it.
     dropped_writing = "writing" in deck_data and "writing" not in merged
@@ -569,7 +662,7 @@ def apply_style(
         "notices": notices,
         # A map of each document, so the orchestrator can read the parts it needs
         # (rules, message & outline) with one run_python read_text + line slice.
-        "style_toc": style_toc(src.read_text(encoding="utf-8")),
+        "style_toc": style_toc(style_html),
         **_guide_tocs(deck_path, names),
     }
 

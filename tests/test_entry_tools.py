@@ -709,6 +709,17 @@ def test_the_verify_guide_holds_rules_and_not_review_mechanics() -> None:
     assert "MUST NOT edit" not in verify, "who may edit is the reviewer's role, not a rule"
 
 
+def test_the_verify_guide_says_a_style_sample_does_not_fix_a_line_count() -> None:
+    """A style is written in one language and its samples break their titles for that
+    language's widths. Copying the break into a deck in another language breaks a line
+    that fits, which no check catches — so the rule belongs here rather than in a
+    writing guide a user may replace."""
+    verify = tools.read_guides(["verify"])["documents"][0]["content"]
+
+    assert "breaks only because the text does not fit" in verify
+    assert "space a style reserves" in verify and "not the number of lines" in verify
+
+
 def test_the_review_role_holds_the_facts_and_how_to_read_them() -> None:
     result = tools.start_reviewing(
         tools.init_deck_workspace("mech")["output_dir"], guide="verify", target="outline"

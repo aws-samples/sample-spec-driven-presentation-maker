@@ -34,6 +34,11 @@ follows is what neither reaches.
   that spaces its words, at a phrase boundary in Japanese and other unspaced ones.
   Never leave a particle, a suffix or a unit stranded at the start of a line, and never
   split a compound or a number from its unit.
+- A line breaks only because the text does not fit. A style's sample slides are written
+  in one language and may show their titles over two lines; the same claim in another
+  language takes a different width, so a break copied from the samples breaks a line
+  that fits. Take the space a style reserves, not the number of lines it happens to
+  use, and measure before deciding.
 - The characters must be the right ones. Visually close characters survive every check
   — in Japanese, 樣 for 様, 狐って for 狙って, 続続月数 for 継続月数.
 

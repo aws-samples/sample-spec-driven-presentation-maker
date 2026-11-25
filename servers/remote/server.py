@@ -965,6 +965,7 @@ def apply_style(
 
     from sdpm.api import (
         _changed_style_fields,
+        fullwidth_font_notice,
         merge_style_metadata,
         missing_deck_fields,
         style_field_sources,
@@ -982,8 +983,9 @@ def apply_style(
         template_analysis = json.loads(analyze_template(template=selected_template, deck_id=deck_id))
         if template_analysis.get("error"):
             raise ValueError(template_analysis["error"])
+    style_html = html_bytes.decode("utf-8")
     merged = merge_style_metadata(
-        html_bytes.decode("utf-8"),
+        style_html,
         template_analysis,
         completed,
     )
@@ -1016,8 +1018,8 @@ def apply_style(
             "updated": updated,
             "sources": sources,
             "missing": missing_deck_fields(merged),
-            "notices": resolved["notices"],
-            "style_toc": style_toc(html_bytes.decode("utf-8")),
+            "notices": resolved["notices"] + fullwidth_font_notice(merged, style_html),
+            "style_toc": style_toc(style_html),
             **resolved["tocs"],
         },
         ensure_ascii=False,

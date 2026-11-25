@@ -709,7 +709,9 @@ def test_a_default_that_was_deleted_falls_back_with_a_notice(deck_with_stores) -
     deck_with_stores.write_state(default_structure="deleted-one")
     result = apply_style(deck_with_stores.make_deck(language="ja"), style="plain")
     assert result["structure"] == "by-audience"
-    assert len(result["notices"]) == 1 and "deleted-one" in result["notices"][0]
+    # Its own notice, not the only one: a ja deck with no full-width face is told that too.
+    about_default = [n for n in result["notices"] if "deleted-one" in n]
+    assert len(about_default) == 1, result["notices"]
 
 
 def test_a_deck_with_no_language_is_told_why_it_got_no_writing_guide(deck_with_stores) -> None:
@@ -734,3 +736,81 @@ def test_a_deck_in_a_language_without_a_bundled_guide_gets_no_writing_copy(
     assert not (deck / "specs" / "writing.md").exists()
     assert "writing" not in result["files"]
     assert result["notices"] == [], "a stated language with no bundled guide is expected"
+
+
+# ---------------------------------------------------------------------------
+# fonts.fullwidth: the field a CJK deck renders through, which neither the style's
+# :root tokens nor a Latin-only template can fill
+# ---------------------------------------------------------------------------
+
+
+def _font_notices(result: dict) -> list[str]:
+    return [n for n in result["notices"] if "fonts.fullwidth" in n]
+
+
+def test_a_japanese_deck_left_without_a_fullwidth_face_is_told_so(deck_with_stores) -> None:
+    """The deck knows it is Japanese; without this the one field that makes Japanese
+    render stays empty and nothing says so."""
+    from sdpm.api import apply_style
+
+    deck_with_stores.write_state()
+    result = apply_style(deck_with_stores.make_deck(language="ja"), style="plain")
+    notices = _font_notices(result)
+    assert len(notices) == 1, result["notices"]
+    assert "'ja'" in notices[0] and "run_python" in notices[0]
+    assert "names no font family" in notices[0], "plain declares no --font-family"
+
+
+def test_the_notice_quotes_the_faces_the_style_itself_names(deck_with_stores) -> None:
+    """Quoting the style's stack hands over its own preference; choosing from it here
+    would guess at which face is full-width capable and which one a reader has."""
+    from sdpm.api import apply_style
+
+    styles = Path(os.environ["SDPM_STYLES_DIR"])
+    (styles / "faced.html").write_text(
+        "<style>:root { --color-text: #111111; --font-family: "
+        '"Avenir Next", Arial, "Hiragino Sans", Meiryo, sans-serif; }</style>',
+        encoding="utf-8",
+    )
+    deck_with_stores.write_state()
+    result = apply_style(deck_with_stores.make_deck(language="ja"), style="faced")
+    notices = _font_notices(result)
+    assert len(notices) == 1, result["notices"]
+    assert "Avenir Next, Arial, Hiragino Sans, Meiryo" in notices[0], "its own order, quotes off"
+    assert "sans-serif" not in notices[0], "a CSS generic names no face"
+
+
+def test_a_deck_that_already_has_a_fullwidth_face_hears_nothing(deck_with_stores) -> None:
+    from sdpm.api import apply_style
+
+    deck_with_stores.write_state()
+    deck = deck_with_stores.make_deck(
+        language="ja", fonts={"fullwidth": "Meiryo", "halfwidth": "Calibri"}
+    )
+    assert _font_notices(apply_style(deck, style="plain")) == []
+
+
+def test_a_latin_deck_hears_nothing_about_a_fullwidth_face(deck_with_stores) -> None:
+    """halfwidth carries Latin text, so an empty fullwidth is not a defect there."""
+    from sdpm.api import apply_style
+
+    deck_with_stores.write_state()
+    assert _font_notices(apply_style(deck_with_stores.make_deck(language="en"), style="plain")) == []
+
+
+def test_a_deck_with_no_language_hears_nothing_about_a_fullwidth_face(deck_with_stores) -> None:
+    """It is already told it has no language; a second notice about a consequence of
+    that would make the first harder to act on."""
+    from sdpm.api import apply_style
+
+    deck_with_stores.write_state()
+    assert _font_notices(apply_style(deck_with_stores.make_deck(), style="plain")) == []
+
+
+@pytest.mark.parametrize("tag", ["ja-JP", "JA", "zh-Hant", "ko", "yue"])
+def test_a_regional_or_cased_tag_is_read_by_its_primary_subtag(deck_with_stores, tag) -> None:
+    from sdpm.api import apply_style
+
+    deck_with_stores.write_state()
+    result = apply_style(deck_with_stores.make_deck(language=tag), style="plain")
+    assert len(_font_notices(result)) == 1, (tag, result["notices"])
