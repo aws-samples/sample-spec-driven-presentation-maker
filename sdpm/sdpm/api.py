@@ -115,7 +115,7 @@ def list_styles_listing(
     styles_dirs: list[Path],
     pinned_names: list[str],
     include_all: bool = False,
-    default_name: str = "",
+    default_names: tuple[str, ...] = (),
 ) -> dict:
     """Build the ``list_styles`` tool payload from the filesystem.
 
@@ -125,7 +125,7 @@ def list_styles_listing(
     """
     from sdpm.knowledge.reference import build_styles_listing
 
-    return build_styles_listing(_list_styles_tagged(styles_dirs), pinned_names, include_all, default_name)
+    return build_styles_listing(_list_styles_tagged(styles_dirs), pinned_names, include_all, default_names)
 
 
 def _list_guides_tagged(guides_dirs: list[Path], kind: str) -> list[dict]:
@@ -144,7 +144,7 @@ def list_guides_listing(
     guides_dirs: list[Path],
     kind: str,
     pinned_names: list[str],
-    default_name: str = "",
+    default_names: tuple[str, ...] = (),
 ) -> list[dict]:
     """List guides of one kind with pin/default/source metadata.
 
@@ -156,7 +156,7 @@ def list_guides_listing(
     from sdpm.knowledge.reference import filter_styles
 
     return filter_styles(
-        _list_guides_tagged(guides_dirs, kind), pinned_names, default_name=default_name
+        _list_guides_tagged(guides_dirs, kind), pinned_names, default_names=default_names
     )
 
 
@@ -380,6 +380,7 @@ def _not_found(kind: str, looked_for: str, dirs: list[Path]) -> dict[str, Any]:
 def _resolve_resources(
     explicit: dict[str, str],
     language: str = "",
+    source_language: str = "",
 ) -> tuple[dict[str, str], dict[str, str], list[str], dict[str, Any] | None]:
     """Resolve each requested kind to a name, before anything is written.
 
@@ -390,6 +391,8 @@ def _resolve_resources(
     Args:
         explicit: Kind -> the name the caller gave, "" for "use the default".
         language: The deck's BCP 47 language tag, used for the writing guide.
+        source_language: The language being translated from. Only translation knows it;
+            it selects a direction guide ("en2ja") over a plain language one.
 
     Returns:
         ``(names, origins, notices, error)``. ``error`` is None when every kind
@@ -404,7 +407,11 @@ def _resolve_resources(
     for kind, given in explicit.items():
         dirs = _kind_dirs(kind)
         name, origin, kind_notices = resolve_default(
-            kind, given, dirs, language=language if kind == "writing" else ""
+            kind,
+            given,
+            dirs,
+            language=language if kind == "writing" else "",
+            source_language=source_language if kind == "writing" else "",
         )
         # An empty name means "apply nothing", except for these two cases, where
         # there is nothing to fall back to: see resolve_default.
@@ -597,6 +604,7 @@ def apply_guides(
     deck_dir: str | Path,
     structure: str = "",
     writing: str = "",
+    source_language: str = "",
 ) -> dict[str, Any]:
     """Apply a structure and writing guide to a deck, leaving its art direction alone.
 
@@ -611,6 +619,8 @@ def apply_guides(
         structure: Structure guide name. "" uses the default.
         writing: Writing guide name. "" uses the default, or the bundled guide for the
             deck's language. A guide that resolves to nothing has its copy removed.
+        source_language: The language the deck was translated from. Selects a direction
+            guide ("en2ja") over a plain language one; empty skips that tier.
 
     Returns:
         Dict with status, the two names, files written, updated (changed deck.json
@@ -629,6 +639,7 @@ def apply_guides(
     names, origins, notices, error = _resolve_resources(
         {"structure": structure, "writing": writing},
         language=deck_data.get("language", ""),
+        source_language=source_language,
     )
     if error:
         return error
@@ -667,7 +678,7 @@ def apply_guides(
 RESOURCE_KINDS = ("style", "structure", "writing")
 
 
-def set_default(kind: str, name: str) -> dict[str, Any]:
+def set_default(kind: str, name: str, scope: str = "") -> dict[str, Any]:
     """Set, switch or clear the default style, structure guide or writing guide.
 
     The default is what apply_style and apply_guides use when the caller names
@@ -675,19 +686,40 @@ def set_default(kind: str, name: str) -> dict[str, Any]:
     Setting, switching and clearing are the same operation, which is why there is one
     function: passing a different name switches, passing "" clears.
 
+    A writing guide needs a ``scope`` because it belongs to a language: without one, a
+    user whose decks are usually Japanese would have Japanese wording rules applied to
+    an English deck. A scope is a language ("ja") or a translation direction
+    ("en2ja"), which are different jobs and so different guides.
+
     Args:
         kind: ``"style"``, ``"structure"`` or ``"writing"``.
         name: The name to make the default, or "" to clear it.
+        scope: Required for ``writing``, rejected for the others.
 
     Returns:
-        Dict with the kind, the name now in effect and any notices. A name that does
+        Dict with the kind, the default now in effect and any notices. A name that does
         not exist is an error and state.json is left alone; clearing checks nothing,
         since there is nothing to point at.
     """
     from sdpm.config import get_state, update_state
+    from sdpm.knowledge.reference import is_valid_scope
 
     if kind not in RESOURCE_KINDS:
         return {"error": f"kind must be one of {list(RESOURCE_KINDS)}, got {kind!r}"}
+    if kind == "writing":
+        if not scope:
+            return {
+                "error": "set_default(kind='writing') needs a scope: the language the guide "
+                "is for (\"ja\"), or the translation direction (\"en2ja\")."
+            }
+        if not is_valid_scope(scope):
+            return {
+                "error": f"scope must be a language or a direction, got {scope!r}. "
+                'A language is its BCP 47 primary subtag ("ja"); a direction is '
+                '"<source>2<target>" ("en2ja").'
+            }
+    elif scope:
+        return {"error": f"{kind} defaults are not per language, so scope does not apply"}
 
     notices: list[str] = []
     if name:
@@ -701,8 +733,25 @@ def set_default(kind: str, name: str) -> dict[str, Any]:
         if pinned and name not in pinned:
             notices.append(f"The default {kind} {name!r} is not among the pinned ones.")
 
+    if kind == "writing":
+        table = dict(writing_defaults())
+        if name:
+            table[scope] = name
+        else:
+            table.pop(scope, None)
+        update_state("default_writing", table)
+        return {"status": "ok", "kind": kind, "defaults": table, "notices": notices}
+
     update_state(f"default_{kind}", name)
     return {"status": "ok", "kind": kind, "default": name, "notices": notices}
+
+
+def writing_defaults() -> dict[str, str]:
+    """The ``default_writing`` table, scope -> guide name."""
+    from sdpm.config import get_state
+
+    table = get_state().get("default_writing")
+    return table if isinstance(table, dict) else {}
 
 
 def style_toc(html: str, snippet: int = 40) -> list[dict[str, Any]]:

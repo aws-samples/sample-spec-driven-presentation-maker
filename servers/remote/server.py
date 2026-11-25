@@ -1032,7 +1032,9 @@ def _bundled_guide_dir(kind: str):
     return {"structure": BUNDLED_STRUCTURES_DIR, "writing": BUNDLED_WRITINGS_DIR}[kind]
 
 
-def _resolve_guides(deck_id: str, deck_data: dict, structure: str, writing: str) -> dict[str, Any]:
+def _resolve_guides(
+    deck_id: str, deck_data: dict, structure: str, writing: str, source_language: str = ""
+) -> dict[str, Any]:
     """Resolve, upload and record the deck's two guides. Shared by apply_style and
     apply_guides so the two cannot disagree about what ``structure=""`` means.
 
@@ -1050,7 +1052,11 @@ def _resolve_guides(deck_id: str, deck_data: dict, structure: str, writing: str)
     for kind, explicit in (("structure", structure), ("writing", writing)):
         bundled = _bundled_guide_dir(kind)
         name, origin, kind_notices = resolve_default(
-            kind, explicit, [bundled], language=language if kind == "writing" else ""
+            kind,
+            explicit,
+            [bundled],
+            language=language if kind == "writing" else "",
+            source_language=source_language if kind == "writing" else "",
         )
         if not name and origin == "argument":
             available = sorted(p.stem for p in bundled.glob("*.md"))
@@ -1104,6 +1110,7 @@ def apply_guides(
     deck_id: Annotated[str, Field(description='Deck ID.')],
     structure: Annotated[str, Field(description='Structure guide name. Empty uses the bundled default.')] = "",
     writing: Annotated[str, Field(description="Writing guide name. Empty uses the bundled guide for deck.json's language.")] = "",
+    source_language: Annotated[str, Field(description='Set only for a deck translated from another: the source language, which selects a direction guide.')] = "",
 ) -> str:
     """Write specs/structure.md and specs/writing.md for a deck without touching its
     art direction. Use it on a deck that has none yet, or after translating one, where
@@ -1114,7 +1121,7 @@ def apply_guides(
     _check_deck_access(deck_id, action="edit_slide")
 
     deck_data = _storage.get_deck_json(deck_id)
-    resolved = _resolve_guides(deck_id, deck_data, structure, writing)
+    resolved = _resolve_guides(deck_id, deck_data, structure, writing, source_language)
     merged = dict(deck_data)
     updated, dropped_writing = _merge_guide_names(deck_data, merged, resolved["names"])
 

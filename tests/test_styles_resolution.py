@@ -227,7 +227,7 @@ def test_filter_styles_pins_matching_no_style_return_all() -> None:
 
 def test_filter_styles_marks_only_the_default() -> None:
     styles = [{"name": "a", "description": ""}, {"name": "b", "description": ""}]
-    result = filter_styles(styles, pinned_names=[], include_all=True, default_name="b")
+    result = filter_styles(styles, pinned_names=[], include_all=True, default_names=["b"])
     assert [s["name"] for s in result if s["default"]] == ["b"]
 
 
@@ -244,7 +244,7 @@ def test_filter_styles_keeps_a_default_the_pins_would_hide() -> None:
         {"name": "b", "description": "", "source": "builtin"},
         {"name": "c", "description": "", "source": "builtin"},
     ]
-    result = filter_styles(styles, pinned_names=["a"], include_all=False, default_name="b")
+    result = filter_styles(styles, pinned_names=["a"], include_all=False, default_names=["b"])
     names = [s["name"] for s in result]
     assert names == ["a", "b"], "the default survives alongside the pins"
     assert "c" not in names
@@ -646,8 +646,8 @@ def test_apply_style_without_a_name_or_a_default_errors(deck_with_stores) -> Non
 def test_apply_style_copies_both_guides_into_the_deck(deck_with_stores) -> None:
     from sdpm.api import apply_style
 
-    deck_with_stores.write_state(default_structure="report-first", default_writing="house")
-    deck = deck_with_stores.make_deck()
+    deck_with_stores.write_state(default_structure="report-first", default_writing={"ja": "house"})
+    deck = deck_with_stores.make_deck(language="ja")
     apply_style(deck, style="plain")
     assert (deck / "specs" / "structure.md").read_text(encoding="utf-8").endswith("rules\n")
     assert (deck / "specs" / "writing.md").read_text(encoding="utf-8").endswith("rules\n")
@@ -658,8 +658,8 @@ def test_apply_style_records_the_three_names_in_deck_json(deck_with_stores) -> N
 
     from sdpm.api import apply_style
 
-    deck_with_stores.write_state(default_structure="report-first", default_writing="house")
-    deck = deck_with_stores.make_deck()
+    deck_with_stores.write_state(default_structure="report-first", default_writing={"ja": "house"})
+    deck = deck_with_stores.make_deck(language="ja")
     apply_style(deck, style="plain")
     written = _json.loads((deck / "deck.json").read_text(encoding="utf-8"))
     assert (written["style"], written["structure"], written["writing"]) == (

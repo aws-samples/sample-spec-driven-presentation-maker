@@ -22,10 +22,14 @@ shell access to it (CLI, or an agent whose tools include a shell).
 - The dictionary also holds the deck.json `title` (the PPTX document title), and apply
   writes its translation into the sibling's deck.json. Extraction sets the sibling's
   `language` to `--target-lang`, so pass the target language as a BCP 47 tag, and then
-  re-resolves the sibling's guides for that language: the source's `specs/writing.md` is
-  replaced with the target language's, or removed when that language has none. Where the
-  sibling has `specs/writing.md`, read it before writing any translated text — the wording
-  rules of the target language, not the source's.
+  re-resolves the sibling's writing guide for that direction: the source's
+  `specs/writing.md` is replaced with the guide for translating source→target where one
+  exists, else the target language's, else removed. Where the sibling has
+  `specs/writing.md`, read it before writing any translated text. A guide for a
+  direction says what a translator does differently: it carries the wording and notation
+  rules of the target language, and leaves out the rules about choosing what a slide
+  claims, because the source already chose that and rewording the claim is a
+  mistranslation.
 - Fill the dictionary, never its keys, and take keys from `translation_map.json` only —
   the `texts.tsv` next to it is an escaped review copy. An empty value keeps the source text.
   Styled-text tags
@@ -38,5 +42,5 @@ shell access to it (CLI, or an agent whose tools include a shell).
 - After applying, build with `generate_pptx(...)`, measure and preview; fix overflow in the
   sibling's slide JSON (`slide_spec` came with this document, and its **Elements** part names
   the guide with each element's fields; `read_guides(["slide-json-spec"])` brings it back).
-  Measurement does not catch unnatural line breaks in the target language — check the
-  previews for those.
+  Review the previews against the sibling's guides — `start_reviewing` dispatches that, and
+  `verify` is where what to look for lives.

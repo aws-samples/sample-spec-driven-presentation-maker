@@ -1193,3 +1193,19 @@ class TestRemoteGuides:
         assert uploaded <= remote_server._MATERIALIZE_FILES, (
             "every spec file apply_guides writes must be downloadable again"
         )
+
+    def test_a_translated_cloud_deck_gets_the_direction_guide(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        storage = self._rig(monkeypatch, language="ja")
+        result = json.loads(remote_server.apply_guides("deck1", source_language="en"))
+        assert result["writing"] == "en2ja"
+        assert result["sources"]["writing"] == "unset-direction"
+        assert "decks/deck1/specs/writing.md" in self._uploaded(storage)
+
+    def test_without_a_source_language_the_cloud_deck_gets_the_language_guide(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        self._rig(monkeypatch, language="ja")
+        result = json.loads(remote_server.apply_guides("deck1"))
+        assert result["writing"] == "ja"

@@ -108,14 +108,32 @@ def test_a_user_guide_of_the_same_name_shadows_the_bundled_one(
     assert items["ja"]["description"] == "My own Japanese rules"
 
 
-def test_list_writings_tool_marks_the_default(
+def test_list_writings_tool_marks_the_default_and_shows_the_scopes(
+    isolated_writings: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A writing guide belongs to a language, so the listing shows which scope each
+    default serves — one boolean could not say whether ja or en2ja was meant."""
+    from sdpm import config
+    from sdpm.tools import list_writings
+
+    config.invalidate_cache()
+    (isolated_writings.parent / "state.json").write_text(
+        '{"default_writing": {"ja": "ja", "en2ja": "house"}}'
+    )
+    result = list_writings()
+    items = {i["name"]: i for i in result["writings"]}
+    assert result["defaults"] == {"ja": "ja", "en2ja": "house"}
+    assert items["ja"]["default"] is True
+    assert items["house"]["default"] is True
+
+
+def test_a_writing_guide_that_is_no_scopes_default_is_not_marked(
     isolated_writings: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from sdpm import config
     from sdpm.tools import list_writings
 
     config.invalidate_cache()
-    (isolated_writings.parent / "state.json").write_text('{"default_writing": "ja"}')
+    (isolated_writings.parent / "state.json").write_text('{"default_writing": {"ja": "ja"}}')
     items = {i["name"]: i for i in list_writings()["writings"]}
-    assert items["ja"]["default"] is True
     assert items["house"]["default"] is False

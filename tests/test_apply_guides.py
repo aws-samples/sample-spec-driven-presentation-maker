@@ -202,3 +202,53 @@ def test_a_structure_guide_this_machine_lacks_does_not_veto_the_writing_fix(
     assert not (sibling / "specs" / "writing.md").exists(), "the writing fix still happened"
     assert "writing" not in sibling_deck
     assert sibling_deck["structure"] == "by-audience", "fell back rather than failing"
+
+
+def test_translating_into_japanese_gets_the_direction_guide(
+    deck: SimpleNamespace, tmp_path: Path
+) -> None:
+    """en->ja is a translation job, so the sibling gets the guide about translating into
+    Japanese, not the one about writing Japanese from scratch."""
+    import subprocess
+    import sys
+
+    deck.set_language("en")
+    (deck.path / "slides").mkdir(exist_ok=True)
+    (deck.path / "slides" / "intro.json").write_text(
+        json.dumps({"id": "intro", "elements": [{"type": "textbox", "text": "Retention over time"}]}),
+        encoding="utf-8",
+    )
+
+    script = Path(__file__).resolve().parents[1] / "sdpm" / "scripts" / "translate_extract.py"
+    done = subprocess.run(
+        [sys.executable, str(script), str(deck.path), "--target-lang", "ja"],
+        capture_output=True, text=True, env={**os.environ},
+    )
+    assert done.returncode == 0, done.stderr
+
+    sibling = deck.path.with_name(f"{deck.path.name}-ja")
+    sibling_deck = json.loads((sibling / "deck.json").read_text(encoding="utf-8"))
+    assert sibling_deck["writing"] == "en2ja", "the direction guide, not plain ja"
+    copied = (sibling / "specs" / "writing.md").read_text(encoding="utf-8")
+    assert "原文" in copied
+    assert "主張を書く" not in copied, "a translator does not choose the claim"
+
+
+def test_the_direction_tier_is_skipped_for_a_deck_written_from_scratch(
+    deck: SimpleNamespace,
+) -> None:
+    """No source language means no direction, so a Japanese deck gets the ja guide."""
+    deck.set_language("ja")
+    result = apply_guides(deck.path)
+    assert result["writing"] == "ja"
+    assert result["sources"]["writing"] == "unset"
+
+
+def test_a_source_language_selects_the_direction_guide(deck: SimpleNamespace) -> None:
+    result = apply_guides(deck.path, source_language="en")
+    assert result["writing"] == ""  # the deck has no language yet
+
+    deck.set_language("ja")
+    result = apply_guides(deck.path, source_language="en")
+    assert result["writing"] == "en2ja"
+    assert result["sources"]["writing"] == "unset-direction"

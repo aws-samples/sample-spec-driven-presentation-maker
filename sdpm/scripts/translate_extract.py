@@ -138,7 +138,7 @@ def _copy_deck(src: Path, dst: Path) -> None:
             shutil.copy2(entry, target)
 
 
-def _reapply_guides(deck: Path, structure: str) -> None:
+def _reapply_guides(deck: Path, structure: str, source_language: str) -> None:
     """Re-resolve the derived deck's writing guide for its new language.
 
     _copy_deck copytrees specs/, so without this the English sibling of a Japanese deck
@@ -149,6 +149,11 @@ def _reapply_guides(deck: Path, structure: str) -> None:
     The structure guide is passed through by name because only the writing guide depends
     on the language. Letting it resolve from the default would replace the structure the
     source deck was actually written against.
+
+    ``source_language`` makes this a translation rather than a deck being written in the
+    target language, so the guide can be one about translating ("en2ja") rather than one
+    about writing that language from scratch: a translator must not reword the claim the
+    source already made.
     """
     from sdpm.api import apply_guides, get_structures_dirs
     from sdpm.knowledge.reference import resolve_default
@@ -166,7 +171,7 @@ def _reapply_guides(deck: Path, structure: str) -> None:
             )
             structure = ""
 
-    result = apply_guides(deck, structure=structure)
+    result = apply_guides(deck, structure=structure, source_language=source_language)
     if result.get("error"):
         print(f"Warning: could not re-resolve the derived deck's guides: {result['error']}", file=sys.stderr)
         return
@@ -234,12 +239,14 @@ def main() -> int:
         title = deck_json.get("title")
         if _is_translatable_string(title, args.skip_short):
             collected.setdefault(title, None)
+        # Read before the overwrite: this is what the deck is being translated from.
+        source_language = deck_json.get("language", "")
         deck_json["language"] = args.target_lang
         deck_json_path.write_text(
             json.dumps(deck_json, ensure_ascii=False, indent=2) + "\n",
             encoding="utf-8",
         )
-        _reapply_guides(dst, deck_json.get("structure", ""))
+        _reapply_guides(dst, deck_json.get("structure", ""), source_language)
 
     # Walk slides/*.json in the derived deck and collect translatable text.
     slides_dir = dst / "slides"

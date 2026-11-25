@@ -23,7 +23,7 @@ _LOCAL = _ROOT / "servers" / "local"
 # a composer calls it on nearly every turn and must not pay a round trip to learn it.
 _DESC_MAX = {"run_python": 700, "read_guides": 700, "hearing": 600}
 _DESC_MAX_DEFAULT = 560
-_TOTAL_MAX = 19_900  # description + schema, all tools, characters (~5K tokens); ACP adds hearing
+_TOTAL_MAX = 20_400  # description + schema, all tools, characters (~5.1K tokens); ACP adds hearing
 
 
 _REMOTE = _ROOT / "servers" / "remote"

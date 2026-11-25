@@ -64,17 +64,68 @@ def stores(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> SimpleNamespace:
             "style": get_styles_dirs, "structure": get_structures_dirs, "writing": get_writings_dirs
         }[kind]()
 
+    def add_writing(name: str) -> None:
+        (writings / f"{name}.md").write_text(f"---\ndescription: {name}\n---\n")
+
     write_state()
-    return SimpleNamespace(write_state=write_state, read_state=read_state, dirs=dirs, path=state_path)
+    return SimpleNamespace(
+        write_state=write_state, read_state=read_state, dirs=dirs, path=state_path,
+        add_writing=add_writing,
+    )
 
 
 @pytest.mark.parametrize(
-    ("kind", "name"), [("style", "plain"), ("structure", "report-first"), ("writing", "house")]
+    ("kind", "name"), [("style", "plain"), ("structure", "report-first")]
 )
 def test_each_kind_records_its_own_default(stores: SimpleNamespace, kind: str, name: str) -> None:
     result = set_default(kind, name)
     assert result["default"] == name
     assert stores.read_state()[f"default_{kind}"] == name
+
+
+def test_a_writing_default_is_recorded_under_its_scope(stores: SimpleNamespace) -> None:
+    result = set_default("writing", "house", scope="ja")
+    assert result["defaults"] == {"ja": "house"}
+    assert stores.read_state()["default_writing"] == {"ja": "house"}
+
+
+def test_a_writing_default_needs_a_scope(stores: SimpleNamespace) -> None:
+    """Without one, a user whose decks are usually Japanese gets Japanese rules on an
+    English deck — the defect the cumulative review found."""
+    result = set_default("writing", "house")
+    assert "needs a scope" in result["error"]
+    assert stores.read_state() == {}
+
+
+@pytest.mark.parametrize("scope", ["en-ja", "EN2JA", "2ja", "en2", "english"])
+def test_a_scope_that_is_neither_a_language_nor_a_direction_is_rejected(
+    stores: SimpleNamespace, scope: str
+) -> None:
+    result = set_default("writing", "house", scope=scope)
+    assert "scope must be a language or a direction" in result["error"]
+    assert stores.read_state() == {}
+
+
+def test_a_direction_scope_is_accepted(stores: SimpleNamespace) -> None:
+    stores.add_writing("house-en2ja")
+    result = set_default("writing", "house-en2ja", scope="en2ja")
+    assert result["defaults"] == {"en2ja": "house-en2ja"}
+
+
+def test_scope_does_not_apply_to_a_style_or_a_structure(stores: SimpleNamespace) -> None:
+    result = set_default("style", "plain", scope="ja")
+    assert "scope does not apply" in result["error"]
+    assert stores.read_state() == {}
+
+
+def test_clearing_one_scope_leaves_the_others(stores: SimpleNamespace) -> None:
+    stores.add_writing("house-en2ja")
+    set_default("writing", "house", scope="ja")
+    set_default("writing", "house-en2ja", scope="en2ja")
+
+    result = set_default("writing", "", scope="ja")
+    assert result["defaults"] == {"en2ja": "house-en2ja"}
+    assert stores.read_state()["default_writing"] == {"en2ja": "house-en2ja"}
 
 
 def test_a_name_that_does_not_exist_changes_nothing(stores: SimpleNamespace) -> None:
@@ -111,6 +162,13 @@ def test_an_empty_name_clears_the_default(stores: SimpleNamespace) -> None:
     assert result["default"] == ""
     assert stores.read_state()["default_structure"] == ""
     assert resolve_default("structure", "", stores.dirs("structure"))[1] == "unset"
+
+
+def test_a_writing_default_reaches_the_deck_of_its_own_language(stores: SimpleNamespace) -> None:
+    set_default("writing", "house", scope="ja")
+    dirs = stores.dirs("writing")
+    assert resolve_default("writing", "", dirs, language="ja") == ("house", "default", [])
+    assert resolve_default("writing", "", dirs, language="en")[0] == ""
 
 
 def test_an_unknown_kind_is_rejected(stores: SimpleNamespace) -> None:

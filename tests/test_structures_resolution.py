@@ -125,7 +125,7 @@ def test_listing_keeps_a_default_the_pins_would_hide(isolated_structures: Path) 
 
     items = {
         i["name"]: i
-        for i in list_guides_listing(get_structures_dirs(), "structure", ["scqa-first"], "by-audience")
+        for i in list_guides_listing(get_structures_dirs(), "structure", ["scqa-first"], ("by-audience",))
     }
     assert items["by-audience"]["default"] is True
 
@@ -141,7 +141,7 @@ def test_listing_marks_the_pinned_ones(isolated_structures: Path) -> None:
 def test_listing_marks_only_the_default(isolated_structures: Path) -> None:
     from sdpm.api import get_structures_dirs, list_guides_listing
 
-    items = {i["name"]: i for i in list_guides_listing(get_structures_dirs(), "structure", [], "internal-report")}
+    items = {i["name"]: i for i in list_guides_listing(get_structures_dirs(), "structure", [], ("internal-report",))}
     assert items["internal-report"]["default"] is True
     assert [i["name"] for i in items.values() if i["default"]] == ["internal-report"]
 

@@ -266,7 +266,8 @@ def list_styles(
     state = get_state()
     styles_dirs = get_styles_dirs()
     pinned = state.get("pinned_styles", [])
-    return list_styles_listing(styles_dirs, pinned, include_all, state.get("default_style", ""))
+    default = state.get("default_style", "")
+    return list_styles_listing(styles_dirs, pinned, include_all, (default,) if default else ())
 
 
 def list_structures() -> dict[str, Any]:
@@ -278,26 +279,35 @@ def list_structures() -> dict[str, Any]:
     from sdpm.config import get_state
 
     state = get_state()
+    default = state.get("default_structure", "")
     return {
         "structures": list_guides_listing(
-            get_structures_dirs(), "structure", state.get("pinned_structures", []), state.get("default_structure", "")
+            get_structures_dirs(),
+            "structure",
+            state.get("pinned_structures", []),
+            (default,) if default else (),
         )
     }
 
 
 def list_writings() -> dict[str, Any]:
     """List writing guides, which decide the wording of titles, body, labels and notes:
-    name, where it came from, its description, whether it is pinned and whether it is
-    the default. The default is used when apply_style is called without one.
+    name, where it came from, its description, whether it is pinned and whether it is a
+    default. A writing guide belongs to a language, so defaults maps each scope — a
+    language like ja, or a translation direction like en2ja — to its guide.
     """
-    from sdpm.api import get_writings_dirs, list_guides_listing
+    from sdpm.api import get_writings_dirs, list_guides_listing, writing_defaults
     from sdpm.config import get_state
 
-    state = get_state()
+    defaults = writing_defaults()
     return {
         "writings": list_guides_listing(
-            get_writings_dirs(), "writing", state.get("pinned_writings", []), state.get("default_writing", "")
-        )
+            get_writings_dirs(),
+            "writing",
+            get_state().get("pinned_writings", []),
+            tuple(defaults.values()),
+        ),
+        "defaults": defaults,
     }
 
 
@@ -326,6 +336,7 @@ def apply_guides(
     deck_id: Annotated[str, Field(description='Deck directory path.')],
     structure: Annotated[str, Field(description='Structure guide name from list_structures. Empty uses the default.')] = "",
     writing: Annotated[str, Field(description="Writing guide name from list_writings. Empty uses the default, or the bundled guide for deck.json's language.")] = "",
+    source_language: Annotated[str, Field(description='Set only for a deck translated from another: the source language, which selects a direction guide.')] = "",
 ) -> dict[str, Any]:
     """Write specs/structure.md and specs/writing.md for a deck without touching its
     art direction. Use it on a deck that has none yet, or after translating one, where
@@ -335,21 +346,25 @@ def apply_guides(
     """
     from sdpm.api import apply_guides as _apply_guides
 
-    return _apply_guides(deck_dir=deck_id, structure=structure, writing=writing)
+    return _apply_guides(
+        deck_dir=deck_id, structure=structure, writing=writing, source_language=source_language
+    )
 
 
 def set_default(
     kind: Annotated[Literal["style", "structure", "writing"], Field(description='Which kind of resource the default is for.')],
     name: Annotated[str, Field(description='Name from the matching list tool. Empty clears the default.')],
+    scope: Annotated[str, Field(description='Writing only, and required: the language the guide is for ("ja"), or the translation direction ("en2ja").')] = "",
 ) -> dict[str, Any]:
     """Set, switch or clear the default style, structure guide or writing guide — what
     apply_style and apply_guides use when called without a name. Call it when the user
-    states a standing preference, so later decks need not name it. A name that does not
-    exist is an error and nothing is saved.
+    states a standing preference, so later decks need not name it. A writing guide
+    belongs to a language, so it needs a scope. A name that does not exist is an error
+    and nothing is saved.
     """
     from sdpm.api import set_default as _set_default
 
-    return _set_default(kind=kind, name=name)
+    return _set_default(kind=kind, name=name, scope=scope)
 
 
 def list_templates() -> dict[str, Any]:

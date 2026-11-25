@@ -13,6 +13,8 @@ from types import SimpleNamespace
 import pytest
 
 from sdpm.knowledge.reference import (
+    is_valid_scope,
+    writing_scope,
     BUNDLED_STRUCTURES_DIR,
     BUNDLED_WRITINGS_DIR,
     resolve_default,
@@ -129,11 +131,13 @@ def test_a_language_without_a_bundled_guide_resolves_to_nothing_and_says_nothing
     assert resolve_default("writing", "", dirs, language="en") == ("", "unset", [])
 
 
-def test_a_configured_writing_default_ignores_the_language(store: SimpleNamespace) -> None:
+def test_a_configured_writing_default_applies_to_its_own_language(store: SimpleNamespace) -> None:
+    """The table is keyed by scope, so a Japanese default cannot reach an English deck."""
     store.add("writing", "house")
-    store.write_state(default_writing="house")
+    store.write_state(default_writing={"ja": "house"})
     dirs = [*store.dirs("writing"), BUNDLED_WRITINGS_DIR]
-    assert resolve_default("writing", "", dirs, language="en") == ("house", "default", [])
+    assert resolve_default("writing", "", dirs, language="ja") == ("house", "default", [])
+    assert resolve_default("writing", "", dirs, language="en") == ("", "unset", [])
 
 
 def test_an_absent_language_resolves_to_nothing_and_says_so(store: SimpleNamespace) -> None:
@@ -149,3 +153,83 @@ def test_a_regional_language_tag_matches_on_its_primary_subtag(store: SimpleName
     store.write_state()
     dirs = [*store.dirs("writing"), BUNDLED_WRITINGS_DIR]
     assert resolve_default("writing", "", dirs, language="ja-JP") == ("ja", "unset", [])
+
+
+# ---------------------------------------------------------------------------
+# writing: the direction tier, and the defect that made it necessary
+# ---------------------------------------------------------------------------
+
+
+def test_a_japanese_default_does_not_reach_an_english_deck(store: SimpleNamespace) -> None:
+    """The defect the cumulative review found: default_writing held one name with no
+    language, so a user who works in Japanese got Japanese rules on an English deck —
+    and not only when translating."""
+    store.write_state(default_writing={"ja": "house-ja"})
+    store.add("writing", "house-ja")
+    dirs = [*store.dirs("writing"), BUNDLED_WRITINGS_DIR]
+
+    assert resolve_default("writing", "", dirs, language="en") == ("", "unset", [])
+    assert resolve_default("writing", "", dirs, language="ja") == ("house-ja", "default", [])
+
+
+def test_the_users_direction_guide_wins_when_translating(store: SimpleNamespace) -> None:
+    store.write_state(default_writing={"ja": "house-ja", "en2ja": "house-en2ja"})
+    store.add("writing", "house-ja")
+    store.add("writing", "house-en2ja")
+    dirs = [*store.dirs("writing"), BUNDLED_WRITINGS_DIR]
+
+    assert resolve_default(
+        "writing", "", dirs, language="ja", source_language="en"
+    ) == ("house-en2ja", "default-direction", [])
+
+
+def test_the_bundled_direction_guide_is_used_when_nothing_is_set(store: SimpleNamespace) -> None:
+    store.write_state()
+    dirs = [*store.dirs("writing"), BUNDLED_WRITINGS_DIR]
+    name, origin, notices = resolve_default(
+        "writing", "", dirs, language="ja", source_language="en"
+    )
+    assert (name, origin, notices) == ("en2ja", "unset-direction", [])
+
+
+def test_without_a_source_language_the_direction_tier_is_skipped(store: SimpleNamespace) -> None:
+    """A deck written from scratch has no direction, so its resolution is unchanged."""
+    store.write_state(default_writing={"en2ja": "house-en2ja"})
+    store.add("writing", "house-en2ja")
+    dirs = [*store.dirs("writing"), BUNDLED_WRITINGS_DIR]
+
+    assert resolve_default("writing", "", dirs, language="ja") == ("ja", "unset", [])
+
+
+def test_a_direction_with_no_guide_falls_through_to_the_language(store: SimpleNamespace) -> None:
+    store.write_state()
+    dirs = [*store.dirs("writing"), BUNDLED_WRITINGS_DIR]
+    # ja2en: no direction guide, and no en guide either.
+    assert resolve_default("writing", "", dirs, language="en", source_language="ja") == (
+        "", "unset", [],
+    )
+
+
+def test_a_regional_tag_is_normalised_on_both_halves(store: SimpleNamespace) -> None:
+    store.write_state()
+    dirs = [*store.dirs("writing"), BUNDLED_WRITINGS_DIR]
+    assert resolve_default(
+        "writing", "", dirs, language="ja-JP", source_language="en-US"
+    )[0] == "en2ja"
+
+
+@pytest.mark.parametrize("scope", ["ja", "en", "en2ja", "ja2en", "fil2ja"])
+def test_a_scope_is_a_language_or_a_direction(scope: str) -> None:
+    assert is_valid_scope(scope)
+
+
+@pytest.mark.parametrize("scope", ["en-ja", "EN2JA", "2ja", "en2", "", "en2ja2ko", "english"])
+def test_anything_else_is_not_a_scope(scope: str) -> None:
+    assert not is_valid_scope(scope)
+
+
+def test_a_direction_scope_is_built_from_both_tags() -> None:
+    assert writing_scope("ja-JP", "en-US") == "en2ja"
+    assert writing_scope("ja") == "ja"
+    assert writing_scope("ja", "") == "ja"
+    assert writing_scope("") == ""

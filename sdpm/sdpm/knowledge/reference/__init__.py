@@ -324,7 +324,7 @@ def filter_styles(
     styles: list[dict],
     pinned_names: list[str],
     include_all: bool = False,
-    default_name: str = "",
+    default_names: Iterable[str] = (),
 ) -> list[dict]:
     """Add pinned/default/source metadata and optionally filter a resource listing.
 
@@ -339,17 +339,19 @@ def filter_styles(
         include_all: If True, return everything. If False, return only
             pinned + user items (all when there are no pins, or when the
             pins match nothing and there are no user items).
-        default_name: The name set as the default for this kind, or "" when
-            none is set. The matching item gets ``default: True``.
+        default_names: The names set as defaults for this kind. A style or structure
+            has at most one; a writing guide has one per scope, so this is a set.
+            Matching items get ``default: True``.
 
     Returns:
         Items with ``pinned: bool``, ``default: bool`` and
         ``source: "builtin"|"user"`` added.
     """
     pin_set = set(pinned_names)
+    default_set = set(default_names)
     result = []
     for s in styles:
-        enriched = {**s, "pinned": s["name"] in pin_set, "default": s["name"] == default_name}
+        enriched = {**s, "pinned": s["name"] in pin_set, "default": s["name"] in default_set}
         if "source" not in enriched:
             enriched["source"] = "builtin"
         result.append(enriched)
@@ -374,7 +376,7 @@ def build_styles_listing(
     styles: list[dict],
     pinned_names: list[str],
     include_all: bool = False,
-    default_name: str = "",
+    default_names: Iterable[str] = (),
 ) -> dict[str, Any]:
     """Build the ``list_styles`` tool payload.
 
@@ -387,7 +389,7 @@ def build_styles_listing(
         ``{"styles": [...]}``; when styles were hidden, additionally
         ``"other_styles": [names]`` and ``"hint": str``.
     """
-    shown = filter_styles(styles, pinned_names, include_all, default_name)
+    shown = filter_styles(styles, pinned_names, include_all, default_names)
     shown_names = {s["name"] for s in shown}
     hidden = [s["name"] for s in styles if s["name"] not in shown_names]
     payload: dict[str, Any] = {"styles": shown}
@@ -402,13 +404,61 @@ def build_styles_listing(
 _KIND_SUFFIX = {"style": ".html", "structure": ".md", "writing": ".md"}
 _BUNDLED_FALLBACK = {"structure": "by-audience"}
 
-# Writing guides are per language, so the fallback is chosen by the deck's language
-# rather than fixed. Keyed by the primary subtag of a BCP 47 tag.
-_BUNDLED_WRITING_BY_LANGUAGE = {"ja": "ja"}
+# A scope is either a language (the BCP 47 primary subtag) or a direction, written
+# <source>2<target>. "2" separates them rather than "-", which would be indistinguishable
+# from a tag like ja-JP.
+_SCOPE_RE = re.compile(r"^[a-z]{2,3}(?:2[a-z]{2,3})?$")
+
+
+def primary_subtag(language: str) -> str:
+    """The part of a BCP 47 tag that names the language: ja-JP -> ja, en-US -> en."""
+    return language.split("-")[0].lower()
+
+
+def writing_scope(language: str, source_language: str = "") -> str:
+    """The scope a writing guide is looked up by: a direction when translating, else a
+    language. Empty when the tags it is built from are not languages."""
+    target = primary_subtag(language)
+    source = primary_subtag(source_language)
+    scope = f"{source}2{target}" if source and target else target
+    return scope if is_valid_scope(scope) else ""
+
+
+def is_valid_scope(scope: str) -> bool:
+    """True for a language ("ja") or a direction ("en2ja"), both halves being languages."""
+    return bool(_SCOPE_RE.match(scope))
 
 
 def _exists_in(name: str, dirs: Iterable[Path], suffix: str) -> bool:
     return any((d / f"{name}{suffix}").exists() for d in dirs)
+
+
+def _writing_defaults(state: dict) -> dict[str, str]:
+    """The ``default_writing`` table, scope -> name. Tolerates anything else as empty."""
+    table = state.get("default_writing")
+    return table if isinstance(table, dict) else {}
+
+
+def _resolve_writing_direction(
+    scope: str, dirs: list[Path], state: dict
+) -> tuple[str, str, list[str]] | None:
+    """The direction tier of a writing guide's resolution, or None to fall through.
+
+    Runs only when translation supplied a source language. A deck being written from
+    scratch has no direction, and its resolution is the language tier alone.
+    """
+    configured = _writing_defaults(state).get(scope, "")
+    if configured and _exists_in(configured, dirs, ".md"):
+        pinned = state.get("pinned_writings", [])
+        notices = (
+            [f"The default writing guide {configured!r} is not among the pinned ones."]
+            if pinned and configured not in pinned
+            else []
+        )
+        return configured, "default-direction", notices
+    if _exists_in(scope, dirs, ".md"):
+        return scope, "unset-direction", []
+    return None
 
 
 def resolve_default(
@@ -416,6 +466,7 @@ def resolve_default(
     explicit: str,
     dirs: list[Path],
     language: str = "",
+    source_language: str = "",
 ) -> tuple[str, str, list[str]]:
     """Decide which guide or style to use, and say where the decision came from.
 
@@ -423,33 +474,49 @@ def resolve_default(
     cannot drift apart. Reads the pins and the ``default_<kind>`` out of ``state.json``
     itself; see design.md for the decision table this implements.
 
+    A writing guide resolves in two tiers, each trying the user's setting before the
+    bundled guide: the direction (``en2ja``) when translation supplied a source
+    language, then the target language (``ja``). "How to write Japanese" and "how to
+    translate English into Japanese" are different documents, and a deck written from
+    scratch has no direction, so it uses the language tier alone.
+
     Args:
         kind: ``"style"``, ``"structure"`` or ``"writing"``.
         explicit: The name the caller was given, or "" when it was given none.
         dirs: Ordered search directories, as ``get_<kind>s_dirs()`` returns them.
         language: The deck's BCP 47 language tag. Selects the bundled writing guide
             and is ignored for the other kinds.
+        source_language: The language being translated from, for the direction tier.
+            Only translation knows it; empty skips that tier.
 
     Returns:
         ``(name, origin, notices)``. ``origin`` is ``"argument"``, ``"default"``,
-        ``"default-missing"`` or ``"unset"``. An empty ``name`` means "apply nothing",
-        except with origin ``"argument"``, where it means the name the caller asked
-        for does not exist and the caller must return an error without writing
-        anything (REQ-3.6). A style resolving to "" is likewise an error, since there
-        is no bundled style to fall back to.
+        ``"default-missing"``, ``"unset"``, or for the direction tier
+        ``"default-direction"`` / ``"unset-direction"``. An empty ``name`` means
+        "apply nothing", except with origin ``"argument"``, where it means the name the
+        caller asked for does not exist and the caller must return an error without
+        writing anything (REQ-3.6). A style resolving to "" is likewise an error, since
+        there is no bundled style to fall back to.
     """
     suffix = _KIND_SUFFIX[kind]
     if explicit:
         # "" here is not "apply nothing" but "the caller named something absent".
         return (explicit if _exists_in(explicit, dirs, suffix) else "", "argument", [])
 
+    state = get_state()
     if kind == "writing":
-        fallback = _BUNDLED_WRITING_BY_LANGUAGE.get(language.split("-")[0].lower(), "")
+        direction = writing_scope(language, source_language) if source_language else ""
+        if direction:
+            resolved = _resolve_writing_direction(direction, dirs, state)
+            if resolved is not None:
+                return resolved
+        fallback = writing_scope(language)
+        fallback = fallback if _exists_in(fallback, dirs, suffix) else ""
+        configured = _writing_defaults(state).get(primary_subtag(language), "")
     else:
         fallback = _BUNDLED_FALLBACK.get(kind, "")
+        configured = state.get(f"default_{kind}", "")
 
-    state = get_state()
-    configured = state.get(f"default_{kind}", "")
     if not configured:
         notices = []
         if kind == "writing" and not language:
