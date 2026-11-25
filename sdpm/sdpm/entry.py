@@ -148,7 +148,12 @@ def start_presentation(
     The styles come from ``list_styles``, which the orchestrator calls when it picks
     one. Keyword overrides let a server whose templates live elsewhere (S3) supply
     its own list; the local filesystem is the default.
+
+    ``review`` is the user's ``config.json`` setting, false unless they turned it on.
+    The guides reach the composer either way; review is the extra pass over the result.
     """
+    from sdpm.config import get_config
+
     if templates is None:
         templates = _templates()
     if output_dir is None:
@@ -159,6 +164,7 @@ def start_presentation(
         "static": {"workflow": _workflow("orchestrator"), "deck_spec": _deck_spec()},
         "templates": templates,
         "output_dir": output_dir,
+        "review": bool(get_config().get("review", False)),
     }
 
 

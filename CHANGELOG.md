@@ -51,7 +51,12 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   Resolution tries the direction first, then the language, taking your own guide before the
   bundled one. Translation re-resolves the derived deck's guide for its new direction, so an
   English sibling stops carrying the Japanese rules.
-- **Review is a role you can dispatch** (`start_reviewing(deck_id, guide, target)`). It
+- **Review is a role you can dispatch** (`config.json` `"review"`,
+  `start_reviewing(deck_id, guide, target)`). Off by default: the guides reach the
+  composers either way, which read them before writing any slide text, so review is a
+  second pass over the result and costs four sub-agent dispatches per deck. Set
+  `"review": true` for decks worth the extra look, or just ask for a review of a deck
+  already built. When it is on, `start_reviewing` is what a reviewer calls first. It
   returns the review role document, the guide to hold the deck against, the files to read,
   and — for `verify` on slides — measured facts about each slide: visible words and
   characters against the style's declared density and its own samples, elements outside or

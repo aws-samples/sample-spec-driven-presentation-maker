@@ -747,3 +747,40 @@ def test_emoji_in_slide_text_is_the_writing_guides_call() -> None:
     for guide in ("examples/writing/ja.md", "examples/writing/en2ja.md"):
         text = (references / guide).read_text(encoding="utf-8")
         assert "絵文字を使わない" in text and "フォントが無い" in text, guide
+
+
+# ---------------------------------------------------------------------------
+# Review is opt-in
+# ---------------------------------------------------------------------------
+
+
+def test_review_is_off_unless_the_user_turned_it_on(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Four sub-agent dispatches per deck is a real cost, and the guides reach the
+    composers either way, so review is opted into rather than out of."""
+    import json as _json
+
+    from sdpm import config
+
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    monkeypatch.setenv("APPDATA", str(tmp_path))
+    config.invalidate_cache()
+    assert tools.start_presentation()["review"] is False
+
+    config_dir = tmp_path / "sdpm"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    (config_dir / "config.json").write_text(_json.dumps({"review": True}))
+    config.invalidate_cache()
+    assert tools.start_presentation()["review"] is True
+
+
+def test_the_orchestrator_gates_the_review_section_on_that_setting() -> None:
+    """The role document has to branch on it, or the setting changes nothing."""
+    workflow = tools.start_presentation()["static"]["workflow"]
+    review = workflow.split("## Review", 1)[1]
+    assert "returned `review`" in review
+    assert "When it is false" in review and "skip this" in review
+    assert "When `review` is true" in review
+    # And a deck built without one can still be reviewed on request.
+    assert "built without one" in review

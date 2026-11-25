@@ -29,6 +29,10 @@ CACHE_DIR = SKILL_ROOT / ".cache"
 _DEFAULTS = {
     "output_dir": "~/Documents/SDPM-Presentations",
     "extra_sources": [],
+    # Off by default: the guides already reach the composer, which reads them before
+    # writing any slide text. Review is a second pair of eyes on top of that, and it
+    # costs four sub-agent dispatches per deck, so it is opted into rather than out of.
+    "review": False,
 }
 
 _cache: Optional[dict] = None

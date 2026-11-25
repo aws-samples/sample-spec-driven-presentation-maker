@@ -97,9 +97,14 @@ Passes, the second waiting for the first to finish:
 
 ## Review
 
-The deck is held against each of its guides by a reviewer, twice: once on the outline and
-once on the composed slides. Dispatch reviewers the same way you dispatch composers, with
-this prompt (replace only the placeholders):
+`start_presentation` returned `review`. When it is false — the default — skip this
+section: the structure, writing and verify guides already reached the composers, which
+read them before writing any slide text, and the user has not asked for a second pass
+over the result. Say nothing about it.
+
+When `review` is true, the deck is held against each of its guides by a reviewer, twice:
+once on the outline and once on the composed slides. Dispatch reviewers the same way you
+dispatch composers, with this prompt (replace only the placeholders):
 
 ```
 You are an sdpm reviewer. First call start_reviewing(deck_id, guide, target) with the
@@ -125,6 +130,9 @@ finding you reject needs no action, but say so if the user asked about it.
 
 Review does not replace the user's confirmation. The findings are material for your
 decision; the user's `show_deck` review is theirs.
+
+A user who asks for a review on a deck built without one gets it the same way: dispatch
+the reviewers now, against the guides the deck already carries.
 
 Composers' own tool results are not visible to you. To see the deck, look at the previews
 yourself — `get_preview(deck_id, slugs=[...])`, or the PNGs under `<deck>/preview/` where you

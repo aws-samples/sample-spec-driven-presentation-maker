@@ -190,7 +190,7 @@ Layout:
 │   └── my-company/
 │       ├── manifest.json
 │       └── logo.svg
-└── config.json         # Per-user config overrides (output_dir, extra_sources, …)
+└── config.json         # Per-user config overrides (output_dir, review, extra_sources, …)
 ```
 
 None of these paths exist by default — create only what you need
@@ -463,7 +463,8 @@ Full schema with defaults:
 ```json
 {
   "output_dir": "~/Documents/SDPM-Presentations",
-  "extra_sources": []
+  "extra_sources": [],
+  "review": false
 }
 ```
 
@@ -471,6 +472,12 @@ Full schema with defaults:
   PPTX files, and where the Local Web UI lists them. Supports `~` expansion; empty means
   the default. `$SDPM_DECK_ROOT`, then `$SDPM_OUTPUT_DIR`, override it.
 - `extra_sources` — Additional asset manifests (see **Option B** above).
+- `review` — Whether the orchestrator holds the finished deck against each of its guides
+  with a reviewer. Off by default. The guides reach the composers either way, and they
+  read them before writing any slide text; review is a second pass over the result, and it
+  costs four sub-agent dispatches per deck (one on the outline, three in parallel on the
+  slides). Turn it on for decks worth the extra look. You can also ask for a review of a
+  deck built without one — nothing about it is decided at build time.
 
 The previously-shipped `sdpm/assets/config.json` is no longer read — it was
 lost on `pip install --upgrade` and is replaced entirely by the user-local
