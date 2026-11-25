@@ -114,12 +114,13 @@ from pathlib import Path
 user_styles_dir = Path(sys.argv[1]).resolve()
 styles_dirs = json.loads(sys.argv[2])
 user_config_dir = Path(sys.argv[3]).resolve()
+bundled_guide_names = json.loads(sys.argv[4])
 
 _GUIDE_KINDS = ("structure", "writing")
 
-def _validate_name(name):
+def _validate_name(name, what="style"):
     if not name or "/" in name or "\\\\" in name or ".." in name:
-        raise PermissionError(f"Invalid style name: {name}")
+        raise PermissionError(f"Invalid {what} name: {name}")
     return name
 
 def read_style(name):
@@ -153,8 +154,13 @@ def write_guide(kind, name, text):
     """Save a structure or writing guide to the user's own store. name = file stem."""
     if kind not in _GUIDE_KINDS:
         raise PermissionError(f"kind must be one of {list(_GUIDE_KINDS)}: {kind}")
-    if not name or "/" in name or "\\\\" in name or ".." in name:
-        raise PermissionError(f"Invalid guide name: {name}")
+    name = _validate_name(name, kind)
+    # A bundled name would shadow the guide every deck falls back to, for every deck.
+    if name in bundled_guide_names.get(kind, []):
+        raise PermissionError(
+            f"{name!r} is a bundled {kind} guide, which this would shadow for every deck. "
+            f"Choose another name."
+        )
     filename = name if name.endswith(".md") else name + ".md"
     dest_dir = user_config_dir / kind
     dest_dir.mkdir(parents=True, exist_ok=True)
@@ -186,6 +192,7 @@ def make_style_runner() -> str:
     """Return the style runner script.
 
     Expects sys.argv[1]=user_styles_dir, sys.argv[2]=styles_dirs JSON,
-    sys.argv[3]=user_config_dir (the root the guide stores live under).
+    sys.argv[3]=user_config_dir (the root the guide stores live under),
+    sys.argv[4]=bundled guide names per kind, as JSON, which write_guide refuses.
     """
     return _RUNNER_STYLE

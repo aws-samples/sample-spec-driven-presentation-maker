@@ -160,18 +160,21 @@ def _reapply_guides(deck: Path, structure: str, source_language: str) -> None:
 
     # apply_guides rejects the whole call for a name it cannot resolve, so a structure
     # guide that is not on this machine would veto the writing fix and leave the sibling
-    # reading the source language's rules. Drop the name instead, and say so.
+    # reading the source language's rules. Leave the kind alone instead of substituting
+    # the default: _copy_deck already carried the source's copy over, and that is the
+    # guide the deck was actually written against.
+    structure_arg: str | None = structure
     if structure:
         found, _, _ = resolve_default("structure", structure, get_structures_dirs())
         if not found:
             print(
-                f"Warning: the deck's structure guide {structure!r} is not in this machine's "
-                f"store; the derived deck falls back to the default.",
+                f"Note: the deck's structure guide {structure!r} is not in this machine's "
+                f"store; the derived deck keeps the copy it inherited.",
                 file=sys.stderr,
             )
-            structure = ""
+            structure_arg = None
 
-    result = apply_guides(deck, structure=structure, source_language=source_language)
+    result = apply_guides(deck, structure=structure_arg, source_language=source_language)
     if result.get("error"):
         print(f"Warning: could not re-resolve the derived deck's guides: {result['error']}", file=sys.stderr)
         return

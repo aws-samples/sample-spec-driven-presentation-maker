@@ -207,3 +207,37 @@ def test_an_unspaced_script_is_measurable_by_characters() -> None:
 def test_the_character_count_ignores_whitespace_and_tags() -> None:
     assert count_visible_characters("<p>two  words</p>") == 8
     assert count_visible_characters("   ") == 0
+
+
+def test_an_element_in_no_region_at_all_is_reported() -> None:
+    """The worst placement error: _owning_region returns None, and skipping it made the
+    slide read as clean."""
+    facts = only_slide(
+        correspondence_facts(deck(region("body", 0, 0, 400, 300), textbox("adrift", 1200, 900)))
+    )
+    (outside,) = facts["outside_regions"]
+    assert outside["region"] is None
+    assert outside["overflow"] == {}
+    assert outside["element"]["type"] == "textbox"
+
+
+def test_a_slide_with_no_regions_reports_no_placement_errors() -> None:
+    """Nothing to be outside of, so every element is where it was put."""
+    facts = only_slide(correspondence_facts(deck(textbox("free", 10, 10))))
+    assert facts["outside_regions"] == []
+
+
+def test_the_styles_own_samples_give_a_script_independent_reference() -> None:
+    """density_limit counts words, so it says nothing usable about Japanese. The style's
+    samples are the same content drawn as the style intends."""
+    from sdpm.engine.checks.correspondence import density_sample_characters
+
+    art = (
+        "<!-- Density: 45 -->\n<body>"
+        '<div class="slide"><p>one two</p></div>'
+        '<div class="slide"><p>three four five six</p></div>'
+        "</body>"
+    )
+    result = correspondence_facts(deck(textbox("x", 0, 0)), art_direction=art)
+    assert result["density_sample_characters"] == 17, "the fullest sample, not the first"
+    assert density_sample_characters("<body>no slides here</body>") is None

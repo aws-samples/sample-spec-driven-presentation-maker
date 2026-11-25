@@ -145,19 +145,26 @@ def list_guides_listing(
     kind: str,
     pinned_names: list[str],
     default_names: tuple[str, ...] = (),
-) -> list[dict]:
-    """List guides of one kind with pin/default/source metadata.
+    include_all: bool = False,
+) -> dict:
+    """Build the ``list_structures`` / ``list_writings`` payload from the filesystem.
 
-    Filesystem-based entry point for MCP Local / CLI. ``kind`` is the store's
-    directory name ("structure" or "writing"), which also decides where a user's
-    own guide lives. Shares the pin filter with styles, so a pinned set narrows
-    the listing the same way.
+    ``kind`` is the store's directory name ("structure" or "writing"), which also
+    decides where a user's own guide lives. Shares the pin filter with styles, so a
+    pinned set narrows the listing the same way — and, as with styles, says which names
+    it left out, so a caller never mistakes a hidden guide for one that does not exist.
     """
-    from sdpm.knowledge.reference import filter_styles
+    from sdpm.knowledge.reference import HIDDEN_GUIDES_HINT, filter_styles
 
-    return filter_styles(
-        _list_guides_tagged(guides_dirs, kind), pinned_names, default_names=default_names
-    )
+    guides = _list_guides_tagged(guides_dirs, kind)
+    shown = filter_styles(guides, pinned_names, include_all, default_names)
+    shown_names = {g["name"] for g in shown}
+    hidden = [g["name"] for g in guides if g["name"] not in shown_names]
+    payload: dict = {f"{kind}s": shown}
+    if hidden:
+        payload[f"other_{kind}s"] = hidden
+        payload["hint"] = HIDDEN_GUIDES_HINT.format(kind=kind)
+    return payload
 
 
 def list_templates_with_metadata(
@@ -602,8 +609,8 @@ def guide_toc(text: str, snippet: int = 40) -> list[dict[str, Any]]:
 
 def apply_guides(
     deck_dir: str | Path,
-    structure: str = "",
-    writing: str = "",
+    structure: str | None = "",
+    writing: str | None = "",
     source_language: str = "",
 ) -> dict[str, Any]:
     """Apply a structure and writing guide to a deck, leaving its art direction alone.
@@ -616,9 +623,12 @@ def apply_guides(
 
     Args:
         deck_dir: Deck output directory path.
-        structure: Structure guide name. "" uses the default.
+        structure: Structure guide name. "" uses the default; None leaves the deck's
+            existing guide and deck.json key alone, for a caller restoring a deck whose
+            recorded guide is not on this machine.
         writing: Writing guide name. "" uses the default, or the bundled guide for the
-            deck's language. A guide that resolves to nothing has its copy removed.
+            deck's language; None leaves it alone. A guide that resolves to nothing has
+            its copy removed.
         source_language: The language the deck was translated from. Selects a direction
             guide ("en2ja") over a plain language one; empty skips that tier.
 
@@ -636,8 +646,15 @@ def apply_guides(
         return {"error": f"deck.json not found in {deck_dir}"}
     deck_data = read_json(deck_json_path)
 
+    # A kind passed as None is left alone: absent from the request, so nothing resolves
+    # it, _copy_guides skips it and its deck.json key keeps whatever it held.
+    requested = {
+        kind: given
+        for kind, given in (("structure", structure), ("writing", writing))
+        if given is not None
+    }
     names, origins, notices, error = _resolve_resources(
-        {"structure": structure, "writing": writing},
+        requested,
         language=deck_data.get("language", ""),
         source_language=source_language,
     )
@@ -645,28 +662,29 @@ def apply_guides(
         return error
 
     merged = deepcopy(deck_data)
-    merged["structure"] = names["structure"]
-    if names["writing"]:
-        merged["writing"] = names["writing"]
-    else:
-        merged.pop("writing", None)
+    for kind in requested:
+        if names[kind]:
+            merged[kind] = names[kind]
+        else:
+            merged.pop(kind, None)
 
     updated = {
         key: merged[key]
-        for key in ("structure", "writing")
+        for key in requested
         if merged.get(key) != deck_data.get(key) and key in merged
     }
     # A dropped key is not a changed value, so the comprehension cannot see it.
-    dropped_writing = "writing" in deck_data and "writing" not in merged
+    dropped = [k for k in requested if k in deck_data and k not in merged]
 
     files = _copy_guides(deck_path, names)
-    if updated or dropped_writing:
+    if updated or dropped:
         write_json(deck_json_path, merged, suffix="\n")
     files["deck.json"] = {"path": str(deck_json_path), "content": merged}
+    notices += [f"Removed the deck's {k} guide: nothing resolved for it." for k in dropped]
     return {
         "status": "ok",
-        "structure": names["structure"],
-        "writing": names["writing"],
+        "structure": names.get("structure", merged.get("structure", "")),
+        "writing": names.get("writing", merged.get("writing", "")),
         "files": files,
         "updated": updated,
         "sources": origins,

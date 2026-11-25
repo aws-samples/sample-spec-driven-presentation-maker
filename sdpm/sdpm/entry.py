@@ -514,16 +514,27 @@ def _review_target_paths(deck_path: Path, target: str) -> list[str]:
 
 
 def _correspondence_facts(deck_path: Path) -> dict[str, Any]:
-    """The measured facts for every slide of the deck, as one payload."""
+    """The measured facts for every slide of the deck, as one payload.
+
+    A malformed file is reported rather than raised: every other failure in
+    ``start_reviewing`` returns an error dict, and one unparsable slide should not take
+    the whole review down.
+    """
     from sdpm.engine.checks import correspondence_facts
     from sdpm.engine.schema import deck_output_format
 
-    deck_json = json.loads((deck_path / "deck.json").read_text(encoding="utf-8"))
+    try:
+        deck_json = json.loads((deck_path / "deck.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as e:
+        return {"error": f"Could not read deck.json: {e}"}
     slides: list[dict] = []
     slides_dir = deck_path / "slides"
     if deck_output_format(deck_json) == "pptx" and slides_dir.is_dir():
         for path in sorted(slides_dir.glob("*.json")):
-            slide = json.loads(path.read_text(encoding="utf-8"))
+            try:
+                slide = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as e:
+                return {"error": f"Could not read slides/{path.name}: {e}"}
             slide.setdefault("id", path.stem)
             slides.append(slide)
     return correspondence_facts(

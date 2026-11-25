@@ -328,11 +328,17 @@ def run_style_python(
     user_styles_dir = str(get_user_config_dir() / "styles")
     styles_dirs_json = json.dumps([str(d) for d in get_styles_dirs()])
     user_config_dir = str(get_user_config_dir())
+    from sdpm.knowledge.reference import BUNDLED_STRUCTURES_DIR, BUNDLED_WRITINGS_DIR
+
+    bundled_names = json.dumps({
+        kind: sorted(p.stem for p in d.glob("*.md"))
+        for kind, d in (("structure", BUNDLED_STRUCTURES_DIR), ("writing", BUNDLED_WRITINGS_DIR))
+    })
 
     try:
         runner = make_style_runner()
         proc = subprocess.run(
-            [sys.executable, "-c", runner, user_styles_dir, styles_dirs_json, user_config_dir],
+            [sys.executable, "-c", runner, user_styles_dir, styles_dirs_json, user_config_dir, bundled_names],
             input=code, capture_output=True, text=True, timeout=120,
         )
         output = proc.stdout

@@ -195,13 +195,16 @@ def test_a_structure_guide_this_machine_lacks_does_not_veto_the_writing_fix(
         capture_output=True, text=True, env={**os.environ},
     )
     assert done.returncode == 0, done.stderr
-    assert "team-house" in done.stderr, "the fallback is reported, not silent"
+    assert "team-house" in done.stderr, "what happened to the structure guide is reported"
 
     sibling = deck.path.with_name(f"{deck.path.name}-en")
     sibling_deck = json.loads((sibling / "deck.json").read_text(encoding="utf-8"))
     assert not (sibling / "specs" / "writing.md").exists(), "the writing fix still happened"
     assert "writing" not in sibling_deck
-    assert sibling_deck["structure"] == "by-audience", "fell back rather than failing"
+    # The structure is left alone rather than replaced by the default: _copy_deck already
+    # carried over the guide the deck was actually written against.
+    assert sibling_deck["structure"] == "team-house"
+    assert (sibling / "specs" / "structure.md").read_text(encoding="utf-8").endswith("rules\n")
 
 
 def test_translating_into_japanese_gets_the_direction_guide(

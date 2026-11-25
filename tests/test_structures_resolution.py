@@ -76,7 +76,7 @@ def isolated_structures(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path
 def test_listing_returns_the_five_fields(isolated_structures: Path) -> None:
     from sdpm.api import get_structures_dirs, list_guides_listing
 
-    items = list_guides_listing(get_structures_dirs(), "structure", [], "")
+    items = list_guides_listing(get_structures_dirs(), "structure", [], "")["structures"]
     assert items, "bundled plus user guides must be listed"
     for item in items:
         assert set(item) >= {"name", "source", "description", "pinned", "default"}
@@ -85,14 +85,14 @@ def test_listing_returns_the_five_fields(isolated_structures: Path) -> None:
 def test_listing_reads_the_frontmatter_description(isolated_structures: Path) -> None:
     from sdpm.api import get_structures_dirs, list_guides_listing
 
-    items = {i["name"]: i for i in list_guides_listing(get_structures_dirs(), "structure", [], "")}
+    items = {i["name"]: i for i in list_guides_listing(get_structures_dirs(), "structure", [], "")["structures"]}
     assert items["scqa-first"]["description"] == "Conclusion first"
 
 
 def test_listing_tags_the_users_own_guides(isolated_structures: Path) -> None:
     from sdpm.api import get_structures_dirs, list_guides_listing
 
-    items = {i["name"]: i for i in list_guides_listing(get_structures_dirs(), "structure", [], "")}
+    items = {i["name"]: i for i in list_guides_listing(get_structures_dirs(), "structure", [], "")["structures"]}
     assert items["scqa-first"]["source"] == "user"
 
 
@@ -106,7 +106,7 @@ def test_listing_shows_the_bundled_guide_when_the_user_has_none(
 
     from sdpm.api import get_structures_dirs, list_guides_listing
 
-    items = {i["name"]: i for i in list_guides_listing(get_structures_dirs(), "structure", [], "")}
+    items = {i["name"]: i for i in list_guides_listing(get_structures_dirs(), "structure", [], "")["structures"]}
     assert items["by-audience"]["source"] == "builtin"
 
 
@@ -114,7 +114,7 @@ def test_listing_hides_unpinned_bundled_guides_once_pins_exist(isolated_structur
     """Same pin filter as styles: pinned plus the user's own, nothing else."""
     from sdpm.api import get_structures_dirs, list_guides_listing
 
-    names = [i["name"] for i in list_guides_listing(get_structures_dirs(), "structure", ["scqa-first"], "")]
+    names = [i["name"] for i in list_guides_listing(get_structures_dirs(), "structure", ["scqa-first"], "")["structures"]]
     assert "scqa-first" in names, "pinned"
     assert "internal-report" in names, "the user's own survives without a pin"
     assert "by-audience" not in names, "neither pinned nor the user's own"
@@ -125,7 +125,7 @@ def test_listing_keeps_a_default_the_pins_would_hide(isolated_structures: Path) 
 
     items = {
         i["name"]: i
-        for i in list_guides_listing(get_structures_dirs(), "structure", ["scqa-first"], ("by-audience",))
+        for i in list_guides_listing(get_structures_dirs(), "structure", ["scqa-first"], ("by-audience",))["structures"]
     }
     assert items["by-audience"]["default"] is True
 
@@ -133,7 +133,7 @@ def test_listing_keeps_a_default_the_pins_would_hide(isolated_structures: Path) 
 def test_listing_marks_the_pinned_ones(isolated_structures: Path) -> None:
     from sdpm.api import get_structures_dirs, list_guides_listing
 
-    items = {i["name"]: i for i in list_guides_listing(get_structures_dirs(), "structure", ["scqa-first"], "")}
+    items = {i["name"]: i for i in list_guides_listing(get_structures_dirs(), "structure", ["scqa-first"], "")["structures"]}
     assert items["scqa-first"]["pinned"] is True
     assert items["internal-report"]["pinned"] is False
 
@@ -141,7 +141,7 @@ def test_listing_marks_the_pinned_ones(isolated_structures: Path) -> None:
 def test_listing_marks_only_the_default(isolated_structures: Path) -> None:
     from sdpm.api import get_structures_dirs, list_guides_listing
 
-    items = {i["name"]: i for i in list_guides_listing(get_structures_dirs(), "structure", [], ("internal-report",))}
+    items = {i["name"]: i for i in list_guides_listing(get_structures_dirs(), "structure", [], ("internal-report",))["structures"]}
     assert items["internal-report"]["default"] is True
     assert [i["name"] for i in items.values() if i["default"]] == ["internal-report"]
 
@@ -149,7 +149,7 @@ def test_listing_marks_only_the_default(isolated_structures: Path) -> None:
 def test_listing_marks_nothing_default_when_none_is_set(isolated_structures: Path) -> None:
     from sdpm.api import get_structures_dirs, list_guides_listing
 
-    items = list_guides_listing(get_structures_dirs(), "structure", [], "")
+    items = list_guides_listing(get_structures_dirs(), "structure", [], "")["structures"]
     assert not any(i["default"] for i in items)
 
 
@@ -166,3 +166,30 @@ def test_list_structures_tool_reads_state(
     items = {i["name"]: i for i in list_structures()["structures"]}
     assert items["scqa-first"]["pinned"] is True
     assert items["scqa-first"]["default"] is True
+
+
+def test_the_listing_names_what_the_pin_filter_hid(isolated_structures: Path) -> None:
+    """As with styles: a hidden guide must not look like one that does not exist."""
+    from sdpm.api import get_structures_dirs, list_guides_listing
+
+    payload = list_guides_listing(get_structures_dirs(), "structure", ["scqa-first"], ())
+    assert payload["other_structures"] == ["by-audience"]
+    assert "list_structures(include_all=True)" in payload["hint"]
+
+    everything = list_guides_listing(
+        get_structures_dirs(), "structure", ["scqa-first"], (), include_all=True
+    )
+    assert "other_structures" not in everything
+    assert {g["name"] for g in everything["structures"]} >= {"by-audience", "scqa-first"}
+
+
+def test_list_structures_passes_include_all_through(
+    isolated_structures: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from sdpm import config
+    from sdpm.tools import list_structures
+
+    config.invalidate_cache()
+    (isolated_structures.parent / "state.json").write_text('{"pinned_structures": ["scqa-first"]}')
+    assert "by-audience" in list_structures()["other_structures"]
+    assert "other_structures" not in list_structures(include_all=True)

@@ -74,7 +74,7 @@ def isolated_writings(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
 def test_writings_listing_returns_the_five_fields(isolated_writings: Path) -> None:
     from sdpm.api import get_writings_dirs, list_guides_listing
 
-    items = list_guides_listing(get_writings_dirs(), "writing", [], "")
+    items = list_guides_listing(get_writings_dirs(), "writing", [], "")["writings"]
     assert items
     for item in items:
         assert set(item) >= {"name", "source", "description", "pinned", "default"}
@@ -84,10 +84,10 @@ def test_writings_listing_keeps_the_bundled_ja_until_pins_narrow_it(isolated_wri
     """The bundled default is listed; the shared pin filter is what removes it."""
     from sdpm.api import get_writings_dirs, list_guides_listing
 
-    unpinned = {i["name"]: i["source"] for i in list_guides_listing(get_writings_dirs(), "writing", [], "")}
+    unpinned = {i["name"]: i["source"] for i in list_guides_listing(get_writings_dirs(), "writing", [], "")["writings"]}
     assert unpinned["house"] == "user"
 
-    pinned = [i["name"] for i in list_guides_listing(get_writings_dirs(), "writing", ["house"], "")]
+    pinned = [i["name"] for i in list_guides_listing(get_writings_dirs(), "writing", ["house"], "")["writings"]]
     assert pinned == ["house"], "ja is neither pinned nor the user's own"
 
 
@@ -103,7 +103,7 @@ def test_a_user_guide_of_the_same_name_shadows_the_bundled_one(
 
     from sdpm.api import get_writings_dirs, list_guides_listing
 
-    items = {i["name"]: i for i in list_guides_listing(get_writings_dirs(), "writing", [], "")}
+    items = {i["name"]: i for i in list_guides_listing(get_writings_dirs(), "writing", [], "")["writings"]}
     assert items["ja"]["source"] == "user"
     assert items["ja"]["description"] == "My own Japanese rules"
 

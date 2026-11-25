@@ -22,6 +22,7 @@ import re
 _TAG_RE = re.compile(r"<[^>]+>")
 _WORD_RE = re.compile(r"[\w%$€£¥+−-]+")
 _DENSITY_RE = re.compile(r"<!--\s*Density:\s*(\d+)\s*-->")
+_COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
 
 # A region takes part in a prefix group only when its name ends in -<number>:
 # "col-1" and "col-2" are two of a kind, "media" is one of a kind.
@@ -58,6 +59,20 @@ def density_limit(art_direction: str) -> int | None:
     return int(found.group(1)) if found else None
 
 
+def density_sample_characters(art_direction: str) -> int | None:
+    """Visible characters on the fullest of the style's own sample slides.
+
+    The declared limit counts space-delimited words, so it says nothing usable about a
+    language that does not space them. The style's samples are the same content drawn
+    the way the style intends, so their character count is a reference a slide in any
+    script can be held against. None when the style has no sample slides.
+    """
+    body = _COMMENT_RE.sub("", art_direction.split("<body", 1)[-1])
+    slides = re.split(r'<div class="slide[\s"]', body)[1:]
+    counts = [count_visible_characters(slide) for slide in slides]
+    return max(counts) if counts else None
+
+
 def _box(element: dict) -> tuple[float, float, float, float] | None:
     """An element's rectangle, accepting both the w/h and the width/height spelling."""
     x, y = element.get("x"), element.get("y")
@@ -77,7 +92,11 @@ def _overlap_area(a: tuple[float, float, float, float], b: dict) -> float:
 
 
 def _owning_region(box: tuple[float, float, float, float], regions: list[dict]) -> dict | None:
-    """The region an element belongs to: the one it overlaps most (REQ-11.4)."""
+    """The region an element belongs to: the one it overlaps most (REQ-11.4).
+
+    None means it overlaps no region at all, which is a worse placement error than
+    overflowing one — so a caller must report that case rather than skip it.
+    """
     overlapping = [(r, _overlap_area(box, r)) for r in regions]
     best = max(overlapping, key=lambda pair: pair[1], default=(None, 0.0))
     return best[0] if best[1] > 0 else None
@@ -169,8 +188,8 @@ def correspondence_facts(slides_data: dict, art_direction: str = "") -> dict:
         art_direction: The deck's specs/art-direction.html, for its density marker.
 
     Returns:
-        ``{"density_limit": int | None, "slides": [...]}`` for a PPTX deck. For an
-        HTML deck, ``{"slides": [], "note": ...}`` saying what it applies to.
+        ``{"density_limit", "density_sample_characters", "slides"}`` for a PPTX deck.
+        For an HTML deck, ``{"slides": [], "note": ...}`` saying what it applies to.
     """
     from sdpm.engine.schema import deck_output_format
     from sdpm.engine.schema.regions import extract_regions
@@ -196,7 +215,19 @@ def correspondence_facts(slides_data: dict, art_direction: str = "") -> dict:
             if box is None:
                 continue
             region = _owning_region(box, regions)
-            over = _overflow(box, region) if region else {}
+            if region is None:
+                # Not an overflow but a placement with no home at all. Reported with
+                # region null, because skipping it made the worst case read as clean.
+                if regions:
+                    outside.append(
+                        {
+                            "element": {"index": index, "type": element.get("type", "")},
+                            "region": None,
+                            "overflow": {},
+                        }
+                    )
+                continue
+            over = _overflow(box, region)
             if over:
                 outside.append(
                     {
@@ -216,4 +247,8 @@ def correspondence_facts(slides_data: dict, art_direction: str = "") -> dict:
                 "repeated_text": _repeated_text(elements, regions),
             }
         )
-    return {"density_limit": density_limit(art_direction), "slides": facts}
+    return {
+        "density_limit": density_limit(art_direction),
+        "density_sample_characters": density_sample_characters(art_direction),
+        "slides": facts,
+    }

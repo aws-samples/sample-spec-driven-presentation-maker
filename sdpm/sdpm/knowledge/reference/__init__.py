@@ -364,6 +364,13 @@ def filter_styles(
     return [s for s in result if s["pinned"] or s["default"] or s["source"] == "user"] or result
 
 
+HIDDEN_GUIDES_HINT = (
+    "Guides listed in other_{kind}s exist too but were left out because they are "
+    "neither pinned nor user-created. When the user names one of them, use it "
+    "directly — do not report it as missing. Call list_{kind}s(include_all=True) to "
+    "see their descriptions."
+)
+
 HIDDEN_STYLES_HINT = (
     "Styles listed in other_styles exist too but were left out because they are "
     "neither pinned nor user-created. When the user names one of them, use it "

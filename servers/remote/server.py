@@ -599,7 +599,10 @@ def start_reviewing(
 
     from sdpm.entry import start_reviewing as _start
 
-    _check_deck_access(deck_id, action="edit_slide")
+    # read, not edit_slide: a reviewer materialises and reads, and reports findings
+    # without touching the deck. Requiring edit permission would shut a viewer out of
+    # the one role whose whole contract is that it never writes.
+    _check_deck_access(deck_id, action="read")
     with tempfile.TemporaryDirectory() as tmpdir:
         root = Path(tmpdir)
         _materialize_deck(deck_id, root)
@@ -1075,8 +1078,12 @@ def _resolve_guides(
             # sandbox writes under specs/ back to S3, and a put_deck_json that fails
             # after the upload leaves the same state. Guarding on the recorded name
             # would make that deck keep retired rules for good, since the name it
-            # would check stays absent.
+            # would check stays absent. Said out loud, because on this stack a
+            # sandbox-written copy is the only way to give a deck custom rules.
             _storage.delete_object_keys([key])
+            notices.append(
+                f"Removed {rel} if the deck had one: nothing resolved for {kind}."
+            )
             continue
         text = (_bundled_guide_dir(kind) / f"{names[kind]}.md").read_text(encoding="utf-8")
         _storage.upload_file(key=key, data=text.encode("utf-8"), content_type="text/markdown")

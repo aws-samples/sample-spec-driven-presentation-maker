@@ -5,6 +5,7 @@ from sdpm.engine.checks.correspondence import (
     count_visible_characters,
     count_visible_words,
     density_limit,
+    density_sample_characters,
 )
 from sdpm.engine.checks.font_size import check_font_size_tokens
 from sdpm.engine.checks.includes import check_includes
@@ -18,4 +19,5 @@ __all__ = [
     "count_visible_characters",
     "count_visible_words",
     "density_limit",
+    "density_sample_characters",
 ]

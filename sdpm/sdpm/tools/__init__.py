@@ -270,45 +270,50 @@ def list_styles(
     return list_styles_listing(styles_dirs, pinned, include_all, (default,) if default else ())
 
 
-def list_structures() -> dict[str, Any]:
+def list_structures(
+    include_all: Annotated[bool, Field(description='Include guides left out by the pin filter.')] = False,
+) -> dict[str, Any]:
     """List structure guides, which decide a deck's backbone and how its slides are
     built: name, where it came from, its description, whether it is pinned and whether
     it is the default. The default is used when apply_style is called without one.
+    Pinned guides and the user's own come back first; other_structures names the rest.
     """
     from sdpm.api import get_structures_dirs, list_guides_listing
     from sdpm.config import get_state
 
     state = get_state()
     default = state.get("default_structure", "")
-    return {
-        "structures": list_guides_listing(
-            get_structures_dirs(),
-            "structure",
-            state.get("pinned_structures", []),
-            (default,) if default else (),
-        )
-    }
+    return list_guides_listing(
+        get_structures_dirs(),
+        "structure",
+        state.get("pinned_structures", []),
+        (default,) if default else (),
+        include_all,
+    )
 
 
-def list_writings() -> dict[str, Any]:
+def list_writings(
+    include_all: Annotated[bool, Field(description='Include guides left out by the pin filter.')] = False,
+) -> dict[str, Any]:
     """List writing guides, which decide the wording of titles, body, labels and notes:
     name, where it came from, its description, whether it is pinned and whether it is a
     default. A writing guide belongs to a language, so defaults maps each scope — a
     language like ja, or a translation direction like en2ja — to its guide.
+    Pinned guides and the user's own come back first; other_writings names the rest.
     """
     from sdpm.api import get_writings_dirs, list_guides_listing, writing_defaults
     from sdpm.config import get_state
 
     defaults = writing_defaults()
-    return {
-        "writings": list_guides_listing(
-            get_writings_dirs(),
-            "writing",
-            get_state().get("pinned_writings", []),
-            tuple(defaults.values()),
-        ),
-        "defaults": defaults,
-    }
+    payload = list_guides_listing(
+        get_writings_dirs(),
+        "writing",
+        get_state().get("pinned_writings", []),
+        tuple(defaults.values()),
+        include_all,
+    )
+    payload["defaults"] = defaults
+    return payload
 
 
 def apply_style(

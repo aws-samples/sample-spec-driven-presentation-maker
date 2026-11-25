@@ -1087,11 +1087,21 @@ class TestWriteGuide:
         assert "kind must be one of" in result["output"]
         assert not list((tmp_path / "sdpm").glob("*/*.md"))
 
-    @pytest.mark.parametrize("name", ["../escape", "sub/dir", "..", ""])
+    @pytest.mark.parametrize("name", ["../escape", "sub/dir", "..", "", "a\\\\b"])
     def test_it_refuses_a_name_that_leaves_the_store(self, name: str, monkeypatch, tmp_path: Path):
         result = self._run(f'write_guide("writing", "{name}", "y")', monkeypatch, tmp_path)
-        assert "Invalid guide name" in result["output"] or "kind must be one of" in result["output"]
+        assert "Invalid writing name" in result["output"], result["output"]
         assert not list(tmp_path.rglob("*.md"))
+
+    def test_it_refuses_a_bundled_name_it_would_shadow(self, monkeypatch, tmp_path: Path):
+        """A bundled name is the guide every deck falls back to, so shadowing it changes
+        every deck, not just this user's own."""
+        result = self._run('write_guide("structure", "by-audience", "y")', monkeypatch, tmp_path)
+        assert "bundled structure guide" in result["output"]
+        assert not list(tmp_path.rglob("*.md"))
+
+        ok = self._run('write_guide("structure", "by-audience-ours", "y")', monkeypatch, tmp_path)
+        assert ok["saved_guides"][0]["filename"] == "by-audience-ours.md"
 
     def test_the_sandbox_still_refuses_file_access(self, monkeypatch, tmp_path: Path):
         result = self._run('open("/etc/passwd")', monkeypatch, tmp_path)
@@ -1209,3 +1219,53 @@ class TestRemoteGuides:
         self._rig(monkeypatch, language="ja")
         result = json.loads(remote_server.apply_guides("deck1"))
         assert result["writing"] == "ja"
+
+    def test_a_reviewer_needs_only_read_permission(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """The reviewer's whole contract is that it never writes, so requiring edit
+        permission would shut a viewer out of the role this change exists to enable."""
+        seen: list[str] = []
+        monkeypatch.setattr(
+            remote_server, "_check_deck_access", lambda deck_id, action="read": seen.append(action)
+        )
+        monkeypatch.setattr(remote_server, "_materialize_deck", lambda deck_id, root: None)
+        monkeypatch.setattr(
+            remote_server, "_storage", MagicMock(get_deck_json=MagicMock(return_value={}))
+        )
+        try:
+            remote_server.start_reviewing("deck1", guide="writing", target="outline")
+        except Exception:
+            pass  # the empty temp dir fails later; the permission check already ran
+        assert seen == ["read"]
+
+    def test_removing_a_writing_copy_is_reported(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """On this stack a sandbox-written copy is the only way to give a deck custom
+        rules, so deleting one silently would lose it without a word."""
+        self._rig(monkeypatch, language="en")
+        result = json.loads(remote_server.apply_guides("deck1"))
+        assert any("writing" in notice for notice in result["notices"]), result["notices"]
+
+    def test_a_cloud_reviewer_reads_the_guide_through_the_materialised_deck(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The end-to-end path no test covered, which is why the guides being absent from
+        _MATERIALIZE_FILES shipped green: apply_guides uploads them, start_reviewing has
+        to get them back."""
+        objects = {
+            "decks/deck1/deck.json": b'{"language": "ja", "structure": "by-audience"}',
+            "decks/deck1/specs/outline.md": b"# Deck\n",
+            "decks/deck1/specs/structure.md": b"---\ndescription: d\n---\n\n## Pick\n",
+        }
+        storage = MagicMock()
+        storage.pptx_bucket = "pptx"
+        storage.list_files.return_value = list(objects)
+        storage.download_file_from_pptx_bucket.side_effect = lambda key: objects[key]
+        monkeypatch.setattr(remote_server, "_storage", storage)
+        monkeypatch.setattr(remote_server, "_check_deck_access", lambda *a, **k: None)
+
+        result = json.loads(
+            remote_server.start_reviewing("deck1", guide="structure", target="outline")
+        )
+        assert "## Pick" in result["guide_text"], "the uploaded guide came back"
+        assert result["target_paths"] == ["specs/outline.md"]
+        assert result["deck_id"] == "deck1", "the caller's id, not the temp dir"
+        assert "# Review" in result["static"]["workflow"]
