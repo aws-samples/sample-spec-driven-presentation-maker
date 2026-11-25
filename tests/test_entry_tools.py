@@ -751,26 +751,35 @@ def test_both_composers_read_the_universal_rules_before_writing_text() -> None:
         assert "specs/writing.md" in doc, mode
 
 
-def test_emoji_in_slide_text_is_the_writing_guides_call() -> None:
-    """A preference belongs to the guide a user can replace. An absolute prohibition in a
-    document they cannot replace would override their own guide."""
+def test_the_no_emoji_rule_reaches_a_deck_in_any_language() -> None:
+    """The renderer has no emoji font, so the rule cannot live in a replaceable guide.
+
+    A writing guide resolves from the deck's language and an English deck resolves to
+    none, so a rule kept only there reaches Japanese decks alone. verify is what every
+    composer reads before writing any slide text, whatever the language.
+    """
     references = Path(__file__).resolve().parents[1] / "sdpm" / "references"
+
+    verify = (references / "guides/verify.md").read_text(encoding="utf-8")
+    assert "emoji" in verify.lower()
 
     for doc in ("workflows/composer.md", "workflows/composer-html.md"):
         text = (references / doc).read_text(encoding="utf-8")
-        assert "emoji" not in text.lower(), f"{doc} states a rule the writing guide owns"
+        assert 'read_guides(["verify"])' in text, f"{doc} must read the guide that owns it"
 
+    # design-rules keeps its own concern — a pictorial mark is an icon — and points at
+    # verify for slide text rather than naming a guide a user can replace.
     design = (references / "guides/design-rules.md").read_text(encoding="utf-8")
-    assert "writing guide" in design, "design-rules points at who owns the text rule"
+    assert "`verify`" in design
+    assert "writing guide's call" not in design
 
     # A style's own sample slides are a different artifact, and a contract test enforces it.
     style = (references / "workflows/style.md").read_text(encoding="utf-8")
     assert "No emoji anywhere" in style
 
-    # The bundled writing guides carry the default and say what overriding it costs.
-    for guide in ("examples/writing/ja.md", "examples/writing/en2ja.md"):
-        text = (references / guide).read_text(encoding="utf-8")
-        assert "絵文字を使わない" in text and "フォントが無い" in text, guide
+    # Not in the writing guides: those carry the choices a deck's author may make.
+    for guide in (references / "examples" / "writing").glob("*.md"):
+        assert "絵文字" not in guide.read_text(encoding="utf-8"), guide.name
 
 
 # ---------------------------------------------------------------------------

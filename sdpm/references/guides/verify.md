@@ -44,6 +44,10 @@ follows is what neither reaches.
   use, and measure before deciding.
 - The characters must be the right ones. Visually close characters survive every check
   — in Japanese, 樣 for 様, 狐って for 狙って, 続続月数 for 継続月数.
+- Slide text carries no emoji. The renderer has no emoji font, so the character placed is
+  not the character that appears. This is the renderer's limit, not a matter of taste, so
+  it holds for every deck in every language and a writing guide cannot choose otherwise.
+  A pictorial mark comes from the asset catalog as an icon instead.
 
 **Constraints:**
 - You MUST look at the preview of every slide before calling it done, even when every
