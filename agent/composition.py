@@ -14,6 +14,10 @@ Picking Source.mcp results are kept for the life of the process (see
 _process_cache_key): the role documents (``static.*``) once per process, the
 per-user environment once per user. They are fetched through the MCP port the
 first time and live only in this process — never in Memory or the history.
+
+A Source.mcp's args may hold another Source (see Source.mcp and _resolved_args),
+so a part can call one tool with what another returned without naming the value
+in configuration.
 """
 
 from __future__ import annotations
@@ -57,6 +61,15 @@ class Source:
         keyed by the last path segment. Identical (tool, args) calls are made once
         per resolve_parts run, so several parts may pick from one response, and
         picked values are kept per process (see _process_cache_key).
+
+        An ``args`` value may itself be a ``Source``: it is resolved first and
+        substituted, so a part can address one tool's result by another's. A JSON
+        array arrives as a list. The inner call shares the run's memo, so an outer
+        sibling picking from the same tool does not fetch it twice::
+
+            Source.mcp("read_guides",
+                       {"names": Source.mcp("start_composing", {}, pick="must_read")},
+                       pick="guides_text")
         """
         return cls(type="mcp", value=tool_name, args=args, pick=pick)
 
@@ -138,6 +151,22 @@ _PROCESS_CACHE: dict[tuple, str] = {}
 _PROCESS_CACHE_LOCK = threading.Lock()
 
 
+def _args_key(args: dict) -> str:
+    """Stable JSON key material for ``args``, nested Sources included.
+
+    A nested Source is rendered by its own key material rather than skipped, so two parts
+    whose args differ only in the inner source never share a cache entry or a memo slot.
+    """
+    return json.dumps(
+        {
+            key: (["source", value.type, value.value, _args_key(value.args), value.pick]
+                  if isinstance(value, Source) else value)
+            for key, value in args.items()
+        },
+        sort_keys=True,
+    )
+
+
 def _process_cache_key(source: Source, user_id: str | None) -> tuple | None:
     """Process-cache key for a picking Source.mcp, or None when it is not cached.
 
@@ -151,7 +180,7 @@ def _process_cache_key(source: Source, user_id: str | None) -> tuple | None:
     """
     if source.type != "mcp" or not source.pick:
         return None
-    base = (source.value, json.dumps(source.args, sort_keys=True), source.pick)
+    base = (source.value, _args_key(source.args), source.pick)
     paths = [p.strip() for p in source.pick.split(",") if p.strip()]
     if paths and all(p == "static" or p.startswith("static.") for p in paths):
         return ("static", *base)
@@ -166,6 +195,34 @@ def clear_process_cache() -> None:
         _PROCESS_CACHE.clear()
 
 
+def _resolved_args(
+    source: Source, mcp_client, context: dict, memo: dict | None, user_id: str | None,
+) -> dict:
+    """``source.args`` with any nested Source resolved and substituted.
+
+    This is what lets a part declare one tool's call in terms of another's result, so the
+    prompt configuration names no guide: ``read_guides`` takes the names that
+    ``start_composing`` said are mandatory. The inner resolution goes through the same
+    ``memo``, so a sibling part picking from that same tool call does not fetch it again.
+
+    A picked JSON array arrives as a list, which is what a list-valued tool argument
+    needs; text that is not JSON is passed through as the string it is.
+    """
+    if not any(isinstance(value, Source) for value in source.args.values()):
+        return source.args
+    resolved: dict = {}
+    for key, value in source.args.items():
+        if not isinstance(value, Source):
+            resolved[key] = value
+            continue
+        text = _resolve_source(value, mcp_client, context, memo, user_id)
+        try:
+            resolved[key] = json.loads(text)
+        except (json.JSONDecodeError, TypeError):
+            resolved[key] = text
+    return resolved
+
+
 def _resolve_source(
     source: Source, mcp_client, context: dict, memo: dict | None = None, user_id: str | None = None,
 ) -> str:
@@ -178,13 +235,14 @@ def _resolve_source(
                 cached = _PROCESS_CACHE.get(cache_key)
             if cached is not None:
                 return cached
+        args = _resolved_args(source, mcp_client, context, memo, user_id)
         # Only picking sources share one call: they exist to slice a single
         # response. Plain Source.mcp keeps its one-call-per-part semantics.
-        key = (source.value, json.dumps(source.args, sort_keys=True))
+        key = (source.value, _args_key(args))
         if source.pick and memo is not None and key in memo:
             text = memo[key]
         else:
-            text = _call_mcp(mcp_client, source.value, source.args)
+            text = _call_mcp(mcp_client, source.value, args)
             if source.pick and memo is not None:
                 memo[key] = text
         content = pick_from_text(text, source.pick) if text else text
