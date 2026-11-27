@@ -24,6 +24,12 @@ DECK_JSON_SKELETON: dict[str, Any] = {
 # HTML decks so PPTX deck.json stays unchanged (not part of DECK_JSON_SKELETON).
 OUTPUT_FORMATS: tuple[str, ...] = ("pptx", "html")
 
+# deck.json "speakerNotes" values: where the PPTX build puts slide "notes".
+# "pptx" (the default when absent) writes them as speaker notes; "markdown" leaves
+# them out of the .pptx and writes them to a Markdown file beside it.
+# Optional, so not part of DECK_JSON_SKELETON.
+SPEAKER_NOTES: tuple[str, ...] = ("pptx", "markdown")
+
 _SUB_ITEM_RE = re.compile(r"^\s{2,}-\s+(body|visual|evidence)\s*:")
 _COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
 _REQUIRED_SUB_ITEMS = ("body", "visual", "evidence")
@@ -105,6 +111,25 @@ def deck_output_format(deck_json: Any) -> Literal["pptx", "html"]:
     if value == "html":
         return "html"
     raise ValueError(f'deck.json outputFormat must be "pptx" or "html", got {value!r}')
+
+
+def deck_speaker_notes(deck_json: Any) -> Literal["pptx", "markdown"]:
+    """Return where the deck's speaker notes go: "pptx" when speakerNotes is absent or
+    None, or when deck.json is not an object.
+
+    Raises ValueError naming the value when speakerNotes is anything other than
+    "pptx" or "markdown".
+    """
+    if not isinstance(deck_json, dict):
+        return "pptx"
+    value = deck_json.get("speakerNotes")
+    if value is None:
+        return "pptx"
+    if value == "pptx":
+        return "pptx"
+    if value == "markdown":
+        return "markdown"
+    raise ValueError(f'deck.json speakerNotes must be "pptx" or "markdown", got {value!r}')
 
 
 def read_deck_format(deck_dir: str | Path) -> Literal["pptx", "html"]:
@@ -214,6 +239,20 @@ def validate_specs(
             output_format = deck_output_format(deck_json)
         except ValueError:
             errors.append('deck.json outputFormat must be "pptx" or "html"')
+
+    if "speakerNotes" in deck_json:
+        try:
+            deck_speaker_notes(deck_json)
+        except ValueError:
+            errors.append('deck.json speakerNotes must be "pptx" or "markdown"')
+
+    # The PPTX build falls back to the first slide's title placeholder, which a cover
+    # drawn with elements does not keep, so the document title is often left empty.
+    if output_format != "html" and not _is_non_empty(deck_json.get("title")):
+        warnings.append(
+            "deck.json title is empty: set it to the deck title the cover shows "
+            "(the PPTX document title)"
+        )
 
     if not _is_non_empty(fonts.get("halfwidth")):
         errors.append("deck.json fonts.halfwidth is empty")

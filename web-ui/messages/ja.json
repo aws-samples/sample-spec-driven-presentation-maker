@@ -17,8 +17,6 @@
     "decks": "デッキ",
     "styles": "スタイル",
     "templates": "テンプレート",
-    "openChat": "チャットを開く",
-    "closeChat": "チャットを閉じる",
     "userMenu": "ユーザーメニュー",
     "settings": "設定",
     "signOut": "サインアウト"
@@ -98,15 +96,18 @@
     "copyUrl": "URL をコピー",
     "openFolder": "フォルダを開く",
     "openPptx": "PPTX を開く",
-    "downloadPptx": "PPTX をダウンロード",
-    "downloadPptxAria": "PPTX をダウンロード: {name}",
+    "downloadPptxWithNotes": "PPTX をダウンロード（スピーカーノート付き）",
+    "downloadPptxWithoutNotes": "PPTX をダウンロード（スピーカーノートなし）",
+    "downloadPptxWithNotesAria": "PPTX をダウンロード（スピーカーノート付き）: {name}",
+    "downloadPptxWithoutNotesAria": "PPTX をダウンロード（スピーカーノートなし）: {name}",
     "makePrivate": "非公開にする",
     "makeInternal": "社内公開にする",
     "delete": "削除",
     "previewAlt": "{name} のプレビュー",
     "internal": "社内公開",
     "private": "非公開",
-    "selectDeck": "{name} を選択"
+    "selectDeck": "{name} を選択",
+    "slideCountShort": "{count} 枚"
   },
   "deckActions": {
     "internal": "社内公開",
@@ -140,6 +141,9 @@
     "openFolder": "フォルダを開く",
     "openPptx": "PPTX を開く",
     "downloadPptx": "PPTX をダウンロード",
+    "pptxWithNotes": "スピーカーノート付き",
+    "pptxWithoutNotes": "スピーカーノートなし",
+    "errorDownloadPptx": "PPTX をダウンロードできませんでした",
     "slideAlt": "スライド {number}",
     "slideAltFull": "スライド {number} / {total}",
     "formatHtml": "HTML",
@@ -165,7 +169,9 @@
     "errorPresent": "発表を開けませんでした",
     "errorPdf": "PDF 用の画面を開けませんでした",
     "errorDownloadHtml": "HTML をダウンロードできませんでした",
-    "errorOpenHtml": "HTML を開けませんでした"
+    "errorOpenHtml": "HTML を開けませんでした",
+    "openChat": "チャットを開く",
+    "chat": "チャット"
   },
   "outline": {
     "body": "本文",
@@ -244,12 +250,12 @@
     "formatHtmlDescription": "ブラウザで発表します。PowerPoint では編集できません",
     "noMatch": "該当なし",
     "loading": "読み込み中…",
-    "keyHint": "↑↓ 移動  ↵ 挿入  Esc 閉じる",
+    "keyHint": "↑↓←→ 移動  ↵ 挿入  Esc 閉じる",
     "listLabel": "テンプレート / スタイル / 形式の候補",
-    "previewAlt": "{name} のプレビュー",
     "unknownName": "このテンプレートまたはスタイルは利用できません",
     "removeToken": "{kind}「{name}」を削除",
-    "layouts": "{count} レイアウト"
+    "all": "すべて",
+    "kindFilter": "表示する種類"
   },
   "chatInput": {
     "maxFilesError": "一度に添付できるファイルは 5 つまでです。",
@@ -266,10 +272,7 @@
     "resizePanel": "チャットパネルの幅を変更",
     "chat": "チャット",
     "newChat": "新しいチャット",
-    "startNewChat": "新しいチャットを開始",
-    "closePanel": "チャットパネルを閉じる",
-    "new": "新規",
-    "deck": "デッキ"
+    "closePanel": "チャットパネルを閉じる"
   },
   "chat": {
     "errorSaveHistory": "チャット履歴を保存できませんでした",
@@ -317,7 +320,11 @@
     "steerComments": "{count, plural, other {コメント # 件}}",
     "backgroundWorking": "コンポーザーが裏で作業中です。チャットは続けられます。",
     "stopping": "停止中…",
-    "reconnecting": "エージェントに再接続中…"
+    "reconnecting": "エージェントに再接続中…",
+    "stageTitle": "どんなプレゼンを作りますか?",
+    "stageSubtitle": "内容を伝えると、エージェントがブリーフ・アートディレクション・アウトラインを固めてからスライドを組みます。",
+    "stagePlaceholder": "聞き手、持ち帰ってほしいこと、だいたいの枚数を書いてください\n/ でテンプレート・スタイル  ⌘↵ で送信",
+    "stagePlaceholderMobile": "聞き手と、持ち帰ってほしいことを書いてください"
   },
   "composerNote": {
     "from": "コンポーザー {group}",
@@ -403,7 +410,8 @@
     "vibePath": "すばやく作成",
     "specPath": "確認しながら作成",
     "vibeSummary": "ラフな素材から、まず初稿をすばやく形にします。",
-    "specSummary": "スライドを作る前に、伝えるストーリーを固めます。"
+    "specSummary": "スライドを作る前に、伝えるストーリーを固めます。",
+    "chipLabel": "進め方: {mode}"
   },
   "htmlFormatPill": {
     "buildAsHtml": "HTML で作成",
@@ -706,5 +714,20 @@
     "needsTextHint": "コメントかメッセージを書くと送信できます",
     "sendFailed": "修正依頼を送信できませんでした",
     "noComment": "コメントなし"
+  },
+  "choiceChip": {
+    "style": "スタイル",
+    "template": "テンプレート",
+    "chooseStyle": "スタイルを選ぶ",
+    "chooseTemplate": "テンプレートを選ぶ",
+    "chosen": "{kind}: {name}",
+    "clearStyle": "スタイルの指定を外す",
+    "clearTemplate": "テンプレートの指定を外す",
+    "searchStyle": "スタイルを検索…",
+    "searchTemplate": "テンプレートを検索…",
+    "auto": "おまかせ",
+    "autoHint": "ブリーフに合わせてエージェントが選びます",
+    "loading": "読み込み中…",
+    "noMatch": "一致するものがありません"
   }
 }

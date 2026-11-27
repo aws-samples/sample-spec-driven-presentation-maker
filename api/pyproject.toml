@@ -5,7 +5,8 @@ description = "spec-driven-presentation-maker REST API Lambda (Layer 4)"
 requires-python = ">=3.11"
 # Versions are locked in the workspace uv.lock (root); scripts/bundle_api_lambda.sh
 # bundles from it. api/ needs sdpm/sdpm only for sdpm.engine.analyzer (template listing
-# and uploaded-template analysis); sdpm-skill brings its dependencies, and with them the
+# and uploaded-template analysis) and sdpm.engine.notes (the PPTX download without speaker
+# notes); sdpm-skill brings its dependencies, and with them the
 # core's document parsers, which api/ does not import. The bundle copies sdpm/sdpm itself.
 dependencies = [
     "sdpm-skill",

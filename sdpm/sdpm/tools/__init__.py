@@ -27,7 +27,7 @@ def start_presentation() -> dict[str, Any]:
     restyling a deck. Call it before any other sdpm tool.
 
     Returns the orchestrator role document (how to run the work end to end) plus what
-    it needs first: PPTX templates and the output directory.
+    it needs first: the deck.json field reference, PPTX templates and the output directory.
     To translate an existing deck into another language, call start_translation instead.
     """
     from sdpm.entry import start_presentation as _start

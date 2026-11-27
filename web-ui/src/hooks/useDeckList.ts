@@ -199,10 +199,10 @@ export function useDeckList(
     }
   }, [idToken, t])
 
-  /** Download the deck's PPTX as `<title>.pptx` (any tab: the API checks read access). */
-  const handleDownload = useCallback((deckId: string) => {
+  /** Download the deck's PPTX as `<title>.pptx`, with or without speaker notes (any tab: the API checks read access). */
+  const handleDownload = useCallback((deckId: string, withNotes = true) => {
     if (!IS_LOCAL && !idToken) return
-    downloadDeckPptx(deckId, idToken ?? "").catch((err) => notifyError(t("errorDownloadPptx"), err))
+    downloadDeckPptx(deckId, idToken ?? "", { withNotes }).catch((err) => notifyError(t("errorDownloadPptx"), err))
   }, [idToken, t])
 
   /** Local: open output.pptx with the default app. */

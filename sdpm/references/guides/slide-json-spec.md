@@ -1,6 +1,6 @@
 ---
 name: slide-json-spec
-description: "Slide JSON format core — deck.json, slides/*.json, comments and regions, notes, placeholders, coordinates, styled text, and the guide holding each element's fields"
+description: "Slide JSON format core — deck folder, slides/*.json, comments and regions, notes, placeholders, coordinates, styled text, and the guide holding each element's fields"
 category: guide
 ---
 
@@ -28,18 +28,8 @@ my-presentation/
 
 ### deck.json
 
-Metadata only. Do NOT put slides here.
-
-- `"template"`: Template filename. Resolved from templates directories.
-- `"fonts"`: **Required**. Font configuration for text rendering.
-  - `"fullwidth"`: Font for fullwidth characters (e.g. Japanese, Chinese)
-  - `"halfwidth"`: Font for halfwidth characters (e.g. English, numbers)
-  - Call `analyze_template(template)` to detect fonts from your template.
-- `"defaultTextColor"`: **Required**. Default color for text and icons (e.g. `"#FFFFFF"` for dark backgrounds, `"#000000"` for light). Overridden per element by `fontColor` / `iconColor`.
-- `"defaultBackground"`: Optional. Solid ground for every slide that does not set its own `background` (e.g. `"#FFF6E5"`). `apply_style` fills it from the style's `--color-bg`; omit to keep the template background. Table auto-colors and icon theme (dark/light) follow it.
-- `"title"`: Optional. Document title written to the PPTX properties (shown by PowerPoint and read by screen readers). Defaults to the first slide's title text.
-- `"language"`: Optional. Document language as a BCP 47 tag (e.g. `"en-US"`, `"ja-JP"`), written to the PPTX properties.
-- Line color, table color, and chart color are auto-resolved from the template's theme colors.
+Deck metadata only; the slides live in `slides/`. Its fields are in the `deck-json-spec` guide.
+An element's `fontColor` / `iconColor` takes precedence over the deck's `defaultTextColor`.
 
 ### slides/{slug}.json
 
@@ -226,5 +216,5 @@ Each element type's fields are in a guide that `read_guides` returns:
   textboxes and images
 - `visual-forms` — when to draw a form, icon use and sizes, and the geometry of flow, cycle,
   hub, hierarchy, matrix, timeline, progress and the other forms
-- `table`, `chart-bar` / `chart-line` / `chart-pie`, `freeform` — the full references of those
+- `table`, `chart-bar` / `chart-line` / `chart-pie` / `chart-radar` / `chart-area`, `freeform` — the full references of those
   elements

@@ -649,6 +649,7 @@ class BuildConfig:
     default_background: str | None = None  # deck.json "defaultBackground"; None keeps template ground
     title: str | None = None  # deck.json "title" -> dc:title; None falls back to the first slide's title
     language: str | None = None  # deck.json "language" -> dc:language (BCP 47, e.g. "en-US")
+    speaker_notes: str = "pptx"  # deck.json "speakerNotes": pptx | markdown (sdpm.engine.schema.SPEAKER_NOTES)
 
 
 def _assemble_slides_from_dir(
@@ -793,6 +794,11 @@ def _resolve_config(
 
     template_file, custom = _resolve_template(data, str(input_path), templates_dirs)
 
+    # Where the speaker notes go; an invalid value stops the build (no silent default)
+    from sdpm.engine.schema import deck_speaker_notes
+
+    speaker_notes = deck_speaker_notes(data)
+
     # Auto-fill fonts
     from sdpm.engine.analyzer import extract_fonts as _extract_fonts
     from sdpm.engine.analyzer import _extract_theme_colors_raw
@@ -888,6 +894,7 @@ def _resolve_config(
         default_background=data.get("defaultBackground") or None,
         title=data.get("title") or None,
         language=data.get("language") or None,
+        speaker_notes=speaker_notes,
     )
 
 
@@ -903,11 +910,18 @@ def _build(config: BuildConfig, output_path: Path) -> Path:
         default_text_color=config.default_text_color,
         auto_spacing=config.auto_spacing,
         default_background=config.default_background,
+        write_notes=config.speaker_notes == "pptx",
     )
     for s in config.slides:
         builder.add_slide(s)
     builder.save(output_path, title=config.title, language=config.language)
     return output_path, builder.invalid_layouts
+
+
+def _notes_markdown_path(output_path: Path) -> Path:
+    """Where ``speakerNotes: "markdown"`` writes the speaker notes: ``<output stem>.notes.md``
+    next to the .pptx (``output.pptx`` -> ``output.notes.md``)."""
+    return output_path.with_name(f"{output_path.stem}.notes.md")
 
 
 def generate(
@@ -931,7 +945,10 @@ def generate(
             bias lines are then left out of ``warnings``.
 
     Returns:
-        Dict with output_path, slide_count, slides summary, warnings.
+        Dict with output_path, slide_count, slides summary, warnings. With deck.json
+        ``"speakerNotes": "markdown"`` and a full build (``only_slugs`` None), also
+        ``notes_path``: the Markdown file holding the speaker notes that were left
+        out of the .pptx (``<output stem>.notes.md`` next to it).
     """
     from sdpm.engine.preview import check_layout_imbalance_data
 
@@ -947,6 +964,23 @@ def generate(
         out = Path(output_path)
 
     _, invalid_layouts = _build(config, out)
+
+    # "markdown": the notes stay out of the .pptx and go to a Markdown file beside it.
+    # A partial build (only_slugs, e.g. iso.pptx) does not write one: it would hold
+    # only the rebuilt slides and overwrite nothing useful.
+    notes_path: Path | None = None
+    if only_slugs is None:
+        if config.speaker_notes == "markdown":
+            from sdpm.engine.notes import speaker_notes_markdown
+
+            notes_path = _notes_markdown_path(out)
+            notes_path.write_text(speaker_notes_markdown(config.slides, title=config.title), encoding="utf-8")
+        else:
+            # A notes file from an earlier "markdown" build must not outlive the
+            # switch back to "pptx": the notes now live in the .pptx itself.
+            stale = _notes_markdown_path(out)
+            if stale.is_file():
+                stale.unlink()
 
     imbalance = check_layout_imbalance_data(out, config.slides)
     if imbalance and not include_checks:
@@ -967,6 +1001,8 @@ def generate(
         "slides": summary,
         "warnings": config.warnings,
     }
+    if notes_path is not None:
+        result["notes_path"] = str(notes_path)
     if invalid_layouts:
         result["invalid_layouts"] = [
             {"slug": e["slug"], "attempted": e["attempted"], "used": e["used"]} for e in invalid_layouts
@@ -1372,6 +1408,8 @@ class PptxRefresh:
             and ``preview`` (``preview_unavailable``) — all only with measure_slides,
             for the measured slugs — and ``pptx_error`` when the full build failed.
         pptx_path: ``<deck>/output.pptx``; None when the full build failed.
+        notes_path: the Markdown speaker notes the full build wrote next to it
+            (deck.json ``speakerNotes`` ``"markdown"``); None otherwise.
         render_slugs: slides that get fresh compose and previews, in deck order.
         compose_slugs: render_slugs plus ``compose_also``, without slides whose layout
             fell back (an invalid layout name), in deck order. Reading it makes the render.
@@ -1384,6 +1422,7 @@ class PptxRefresh:
         self.plan = plan
         self.result: dict[str, Any] = {}
         self.pptx_path: Path | None = None
+        self.notes_path: Path | None = None
         self.render_slugs: list[str] = []
         self.render_error: str | None = None
         self._compose_slugs: list[str] = []
@@ -1602,6 +1641,7 @@ def refresh_pptx(
     try:
         built = generate(json_path=deck_input, output_path=str(deck / "output.pptx"), include_checks=True)
         refresh.pptx_path = Path(built.get("output_path", deck / "output.pptx"))
+        refresh.notes_path = Path(built["notes_path"]) if built.get("notes_path") else None
         build_warnings = built.get("warnings", [])
         checks = built.get("checks", {})
     except Exception as exc:

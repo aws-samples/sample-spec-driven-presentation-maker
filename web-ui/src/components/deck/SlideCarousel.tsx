@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: MIT-0
 /**
  * SlideCarousel — Vertical scroll layout for slide PNG previews with spec step navigation.
- * Shows all slides stacked vertically with PPTX download and folder open links.
+ * Shows all slides stacked vertically with PPTX download (cloud: a menu with or without
+ * speaker notes) and folder open links.
  * Features a polished loading animation during PPTX generation.
  * Integrates SpecStepNav for viewing brief/outline/art-direction content.
  *
@@ -21,13 +22,14 @@
 
 import { useState, useEffect, useRef, useCallback } from "react"
 import { AnimatePresence, motion } from "motion/react"
-import { SlidePreview, fetchHtmlUrl } from "@/services/deckService"
+import { SlidePreview, downloadDeckPptx, fetchHtmlUrl } from "@/services/deckService"
 import { openInOs } from "@/services/localService"
 import type { ScriptWarning, SpecFiles } from "@/services/deckService"
-import { Download, ExternalLink, Layers, LayoutGrid, Presentation, Printer, Rows3, FolderOpen } from "lucide-react"
+import { Download, ExternalLink, Layers, LayoutGrid, MessageSquare, Presentation, Printer, Rows3, FolderOpen, FileText } from "lucide-react"
 import { usePreferences } from "@/hooks/usePreferences"
 import { SpecStepNav, SpecMarkdownPreview } from "@/components/deck/SpecStepNav"
 import type { SpecTab } from "@/components/deck/SpecStepNav"
+import { deckDisplay } from "@/lib/deckTitle"
 import { SlideThumbnail } from "@/components/deck/SlideThumbnail"
 import { AnimatedSlidePreview } from "@/components/deck/AnimatedSlidePreview"
 import { HtmlDeckPlayer, type HtmlPlayerSlide } from "@/components/deck/HtmlDeckPlayer"
@@ -46,6 +48,7 @@ import { ReviewToolButton } from "@/components/review/ReviewToolButton"
 import { ReviewToolHint } from "@/components/review/ReviewToolHint"
 import { ReviewCommentCard } from "@/components/review/ReviewCommentCard"
 import { ReviewKeyboard } from "@/components/review/ReviewKeyboard"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
 
 /**
@@ -85,6 +88,8 @@ interface SlideCarouselProps {
   onScrollComplete?: () => void
   /** Optional header actions (e.g. visibility toggle, share button). */
   headerActions?: React.ReactNode
+  /** Reopen the closed chat sheet (desktop); omit while it is open. */
+  onOpenChat?: () => void
   /** Owner alias to display. */
   ownerAlias?: string
   /** Spec files for the deck (null values = not yet created). */
@@ -107,11 +112,13 @@ interface SlideCarouselProps {
   slideSize?: { width: number; height: number }
   /** HTML decks (cloud): slides whose script can send data outside the deck. */
   scriptWarnings?: ScriptWarning[]
+  /** PPTX decks: how the stored PPTX holds its speaker notes; "markdown" disables the download with notes. */
+  speakerNotes?: "pptx" | "markdown"
 }
 
 const HEADER_BUTTON = "inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-md hover:bg-accent transition-colors"
 
-export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLoading, onSlideClick, scrollToSlide, onScrollComplete, headerActions, ownerAlias, specs, workflowPhase, onStyleSelect, onTemplateSelect, currentTemplate, idToken, outputFormat, htmlUrl, slideSize, scriptWarnings }: SlideCarouselProps) {
+export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLoading, onSlideClick, scrollToSlide, onScrollComplete, headerActions, onOpenChat, ownerAlias, specs, workflowPhase, onStyleSelect, onTemplateSelect, currentTemplate, idToken, outputFormat, htmlUrl, slideSize, scriptWarnings, speakerNotes }: SlideCarouselProps) {
   const t = useTranslations("carousel")
   const isHtml = outputFormat === "html"
   const slidesWithPreview = slides.filter((s) => s.previewUrl || s.composeUrl)
@@ -306,6 +313,13 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
   async function handlePptxOpen() {
     if (!deckId || !IS_LOCAL) return
     openInOs(deckId, "output.pptx").catch((err) => notifyError(t("errorOpenPptx"), err, { retry: handlePptxOpen }))
+  }
+
+  /** Cloud: download the PPTX with or without speaker notes (a fresh signed URL each time). */
+  async function handlePptxDownload(withNotes: boolean) {
+    if (!deckId || IS_LOCAL) return
+    downloadDeckPptx(deckId, idToken ?? "", { withNotes })
+      .catch((err) => notifyError(t("errorDownloadPptx"), err, { retry: () => void handlePptxDownload(withNotes) }))
   }
 
   /**
@@ -574,40 +588,38 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
       {defsUrl && viewMode === "full" && specTab === "slides" && (
         <DeckDefs defsUrl={defsUrl} onStatusChange={handleDefsStatus} />
       )}
-      {/* Spec step navigation */}
-      <SpecStepNav
-        specs={specs}
-        activeTab={specTab}
-        onTabChange={setSpecTab}
-        slideCount={slidesWithPreview.length}
-      />
-
-      {/* Header (shown only on Slides tab) */}
-      {specTab === "slides" && (
-        <div className="flex-none flex items-center justify-between px-5 py-3 border-b border-border/40">
-          <div className="flex items-center gap-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-sm font-medium truncate max-w-[200px]">
-                  {deckName || t("preview")}
-                </h2>
-                {isHtml && (
-                  <span
-                    className="shrink-0 rounded border border-border px-1.5 py-px text-[11px] font-medium text-foreground-secondary"
-                    title={t("formatBadgeTitle")}
-                  >
-                    {t("formatHtml")}
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {t("slideCount", { count: slidesWithPreview.length })}
-                {ownerAlias && <span> · {t("byOwner", { owner: ownerAlias })}</span>}
-              </p>
+      {/* Workspace bar: the deck, its phases, and the Slides tools — one row, wrapping when narrow */}
+      <div className="@container flex-none flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-2 border-b border-border/40">
+        <div className="flex min-w-0 items-center gap-2">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <h2 className="text-[15px] font-semibold tracking-[-0.02em] truncate max-w-[240px]" title={deckName}>
+                {deckName ? deckDisplay(deckName).title : t("preview")}
+              </h2>
+              {isHtml && (
+                <span
+                  className="shrink-0 rounded border border-border px-1.5 py-px text-[11px] font-medium text-foreground-secondary"
+                  title={t("formatBadgeTitle")}
+                >
+                  {t("formatHtml")}
+                </span>
+              )}
             </div>
-            {headerActions}
+            <p className="text-xs text-muted-foreground whitespace-nowrap">
+              {t("slideCount", { count: slidesWithPreview.length })}
+              {ownerAlias && <span> · {t("byOwner", { owner: ownerAlias })}</span>}
+            </p>
           </div>
-          <div className="flex items-center gap-1">
+          {headerActions}
+        </div>
+        <SpecStepNav
+          specs={specs}
+          activeTab={specTab}
+          onTabChange={setSpecTab}
+          slideCount={slidesWithPreview.length}
+        />
+        {specTab === "slides" && (
+          <div className="ml-auto flex items-center gap-1">
             {reviewOn && <ReviewToolButton on={toolOn} onClick={() => review?.toggleTool()} />}
             {/* View mode toggle */}
             <div className="flex items-center rounded-lg border border-border/40 p-0.5 mr-1">
@@ -631,31 +643,32 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
                 onClick={handleFolderOpen}
                 className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-md hover:bg-accent transition-colors"
                 aria-label={t("openFolder")}
+                title={t("openFolder")}
               >
                 <FolderOpen className="h-3.5 w-3.5" />
-                {t("folder")}
+                <span className="@max-5xl:sr-only">{t("folder")}</span>
               </button>
             )}
             {isHtml && htmlUrl && (
               IS_LOCAL ? (
-                <button onClick={handleHtmlOpen} className={HEADER_BUTTON} aria-label={t("openHtml")}>
+                <button onClick={handleHtmlOpen} className={HEADER_BUTTON} aria-label={t("openHtml")} title={t("openHtml")}>
                   <ExternalLink className="h-3.5 w-3.5" />
-                  {t("open")}
+                  <span className="@max-5xl:sr-only">{t("open")}</span>
                 </button>
               ) : (
                 <>
                   {scriptWarnings && scriptWarnings.length > 0 && <ScriptWarningBadge warnings={scriptWarnings} />}
-                  <button onClick={() => void handleHtmlPresent("present")} className={HEADER_BUTTON} aria-label={t("presentAria")}>
+                  <button onClick={() => void handleHtmlPresent("present")} className={HEADER_BUTTON} aria-label={t("presentAria")} title={t("presentAria")}>
                     <Presentation className="h-3.5 w-3.5" />
-                    {t("present")}
+                    <span className="@max-5xl:sr-only">{t("present")}</span>
                   </button>
-                  <button onClick={() => void handleHtmlPresent("pdf")} className={HEADER_BUTTON} aria-label={t("pdfAria")}>
+                  <button onClick={() => void handleHtmlPresent("pdf")} className={HEADER_BUTTON} aria-label={t("pdfAria")} title={t("pdfAria")}>
                     <Printer className="h-3.5 w-3.5" />
-                    {t("pdf")}
+                    <span className="@max-5xl:sr-only">{t("pdf")}</span>
                   </button>
-                  <button onClick={() => void handleHtmlDownload()} className={HEADER_BUTTON} aria-label={t("downloadHtml")}>
+                  <button onClick={() => void handleHtmlDownload()} className={HEADER_BUTTON} aria-label={t("downloadHtml")} title={t("downloadHtml")}>
                     <Download className="h-3.5 w-3.5" />
-                    {t("formatHtml")}
+                    <span className="@max-5xl:sr-only">{t("formatHtml")}</span>
                   </button>
                 </>
               )
@@ -666,25 +679,47 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
                   onClick={handlePptxOpen}
                   className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-md hover:bg-accent transition-colors"
                   aria-label={t("openPptx")}
+                  title={t("openPptx")}
                 >
-                  <FolderOpen className="h-3.5 w-3.5" />
-                  PPTX
+                  <FileText className="h-3.5 w-3.5" />
+                  <span className="@max-5xl:sr-only">PPTX</span>
                 </button>
               ) : (
-                <a
-                  href={pptxUrl}
-                  download
-                  className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground no-underline px-3 py-1.5 rounded-md hover:bg-accent transition-colors"
-                  aria-label={t("downloadPptx")}
-                >
-                  <Download className="h-3.5 w-3.5" />
-                  PPTX
-                </a>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className={HEADER_BUTTON} aria-label={t("downloadPptx")} title={t("downloadPptx")}>
+                      <Download className="h-3.5 w-3.5" />
+                      <span className="@max-5xl:sr-only">PPTX</span>
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      disabled={speakerNotes === "markdown"}
+                      onSelect={() => void handlePptxDownload(true)}
+                    >
+                      {t("pptxWithNotes")}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => void handlePptxDownload(false)}>
+                      {t("pptxWithoutNotes")}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )
             )}
           </div>
-        </div>
-      )}
+        )}
+        {onOpenChat && (
+          <button
+            onClick={onOpenChat}
+            className={`${HEADER_BUTTON} ${specTab === "slides" ? "" : "ml-auto"}`}
+            aria-label={t("openChat")}
+            title={t("openChat")}
+          >
+            <MessageSquare className="h-3.5 w-3.5" />
+            <span className="@max-5xl:sr-only">{t("chat")}</span>
+          </button>
+        )}
+      </div>
 
       {reviewOn && specTab === "slides" && (
         <>

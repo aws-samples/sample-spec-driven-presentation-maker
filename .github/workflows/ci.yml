@@ -29,6 +29,22 @@ jobs:
         run: cd sdpm/vendor && sha256sum -c SHA256SUMS
       - name: Test
         run: uv run pytest tests/ -v --cov=sdpm --cov-report=term
+      # Report only: the text each session puts in front of the model (at start, and with
+      # the guides its role names), with +/- against the base commit when it can be measured.
+      - name: Context size report
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          base_args=()
+          if [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ && "$BASE_SHA" != 0000000000000000000000000000000000000000 ]] \
+            && git fetch --quiet --depth=1 origin "$BASE_SHA" \
+            && git worktree add --quiet --detach "$RUNNER_TEMP/base" "$BASE_SHA" \
+            && uv run python scripts/context_size.py --root "$RUNNER_TEMP/base" --json "$RUNNER_TEMP/base.json" > /dev/null; then
+            base_args=(--base "$RUNNER_TEMP/base.json")
+          else
+            echo "::notice::Base commit not measured; the report has no +/- column."
+          fi
+          uv run python scripts/context_size.py --json "$RUNNER_TEMP/context-size.json" "${base_args[@]}" >> "$GITHUB_STEP_SUMMARY"
 
   # Local-surface guard: boots servers/local over real stdio (no mocks) and
   # exercises filesystem-anchored resolution (templates, workflows). The unit

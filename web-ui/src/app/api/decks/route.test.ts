@@ -25,6 +25,9 @@ beforeAll(async () => {
   process.env.SDPM_DECK_ROOT = root
   write("built/deck.json", JSON.stringify({ name: "Built" }))
   write("built/output.pptx", "PK")
+  write("mdnotes/deck.json", JSON.stringify({ name: "Markdown notes", speakerNotes: "markdown" }))
+  write("mdnotes/output.pptx", "PK")
+  write("mdnotes/output.notes.md", "# Speaker notes\n")
   write("draft/deck.json", JSON.stringify({ name: "Draft" }))
   write("web/deck.json", JSON.stringify({ name: "Web", outputFormat: "html" }))
   write("web/output.pptx", "PK")
@@ -52,6 +55,14 @@ describe("GET /api/decks (local)", () => {
     expect(byId.draft.hasPptx).toBe(false)
     expect(byId.web.hasPptx).toBe(false)
     expect(decks.every((d: Record<string, unknown>) => !("pptxUrl" in d))).toBe(true)
+  })
+
+  it("says where the speaker notes of the built PPTX are", async () => {
+    const { decks } = await (await GET()).json()
+    const byId = Object.fromEntries(decks.map((d: { deckId: string }) => [d.deckId, d]))
+    expect(byId.mdnotes.speakerNotes).toBe("markdown")
+    expect(byId.built.speakerNotes).toBe("pptx")
+    expect(byId.draft.speakerNotes).toBe("pptx")
   })
 
   it("does not read a deck.json that is a symlink pointing out of the deck", async () => {

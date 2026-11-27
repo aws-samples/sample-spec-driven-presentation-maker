@@ -34,6 +34,8 @@ make format   # ruff format (write changes)
 
 For web-ui / infra TypeScript changes, use `npm ci` in the respective directory.
 
+When you change a role document, a guide, a prompt or a tool description, check how much text it puts in front of the model: `uv run python scripts/context_size.py` prints chars, bytes and approximate tokens per session (for example, Local MCP orchestrator = instructions + tool definitions + the `start_presentation` payload). CI writes the same table, with +/- against the base commit, to the job summary of the `python` job. At equal quality, shorter wins.
+
 The [Developer guide](docs/en/developer-guide.md) covers working from a checkout next to an installed release (`make register-dev`, `npm run dev:local`) and deploying with the CDK.
 
 ## Security scanning

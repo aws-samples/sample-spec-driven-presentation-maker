@@ -13,8 +13,198 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ## [Unreleased]
 
+### Added
+
+- **Speaker notes destination** (`deck.json` `"speakerNotes"`, #666). `"pptx"` (the
+  default, unchanged behaviour) writes each slide's `notes` as speaker notes; `"markdown"`
+  leaves them out of the .pptx and writes them to `<output stem>.notes.md` beside it (one
+  `## pageNN — title` section per slide, `{{...}}` styling removed), returned as `notes_path`
+  by `generate_pptx`. A deck handed to an audience no longer carries the presenter's script,
+  which imported slides often bring along in their original notes. The slide files keep their
+  `notes`, so composing is unchanged; an invalid value is a `check_specs` error and stops the
+  build. Partial builds (`iso.pptx`) write no notes file; a full `"pptx"` build deletes a
+  notes file left by an earlier `"markdown"` build. PPTX decks only. On the AWS stack the
+  remote `generate_pptx` uploads the notes beside the deck (`pptx/<deckId>/<build>.notes.md`,
+  deck record `notesS3Key`) and returns `notesS3Key` and a signed `notesUrl`; the rebuild
+  after `run_python` uploads them and updates `notesS3Key` the same way.
+- **Download PPTX with or without speaker notes** (Web UI, both modes). The deck list "⋯"
+  menu has two download items, with speaker notes and without speaker notes; on the AWS
+  stack the deck view's PPTX button opens a menu with the same two choices (the local
+  "Open PPTX" button is unchanged). "With speaker notes" is unavailable for a deck built with `speakerNotes: "markdown"`,
+  whose stored .pptx holds no notes. The copy without notes is made from the stored .pptx
+  without a rebuild (`sdpm.engine.notes.strip_speaker_notes`): `GET /decks/{id}/pptx?notes=without`
+  on the AWS stack, which keeps it beside the build as `pptx/<deckId>/<build>.nonotes.pptx`
+  for later downloads, and `GET /api/decks/{id}/pptx?notes=without` locally. Deck list items
+  and the deck detail carry `speakerNotes` (`"pptx"` | `"markdown"`) for the stored .pptx.
+- **`deck-json-spec` guide.** Every `deck.json` field of PPTX and HTML decks in one list:
+  required or optional, default, who writes it and which format it affects.
+  `start_presentation` returns it as `static.deck_spec`, and the AWS stack's agent puts it in
+  the orchestrator's system prompt; `slide-json-spec` and `slide-html-spec` point to it.
+- **Area charts** (`chartType: "area"`, #620). An area chart takes the same categories and
+  series as a bar chart; `stacked: true` stacks the areas, and series `color`, `valueAxis`,
+  `categoryAxis`, `style`, `legend` and `dataLabels` work as for `bar`. `pptx_to_json`
+  reads an area or stacked area chart back as `area`, so an edited one is rebuilt from its
+  JSON; a 100% stacked area chart still keeps its `_chartXml`. New `chart-area` guide.
+  Local mode and the AWS stack (SdpmRuntime).
+- **Context size report** (#679). `scripts/context_size.py` measures the text each session
+  puts in front of the model: server instructions, tool definitions, prompts, `start_*`
+  payloads, guides, bundled styles, the agent system prompts and the text the agent inserts,
+  and client wiring text, per item and per role bundle (at start, and with the guides the role
+  names), in chars, bytes and approximate tokens (tiktoken `o200k_base`). Contributor files
+  (AGENTS.md, steering) get a table of their own, and the report lists what it does not
+  measure. CI writes the table, with +/- against the base commit, to the `python` job
+  summary. Report only; nothing fails on size. Development only.
+
+### Fixed
+
+- **Built PPTX decks carry a document title and language.** The PPTX title (`dc:title`)
+  came from `deck.json` `title`, or, without one, from the first slide's title placeholder.
+  The orchestrator did not write `title`, and a cover drawn with elements keeps no title
+  placeholder, so many decks had no document title. The orchestrator now writes `title`
+  (as the cover states it) and `language` into `deck.json` with the outline, and
+  `check_specs` warns when a PPTX deck has no `title` (a warning; it does not stop the
+  build). Translation now translates `title` along with the slides (`translate_extract.py`
+  puts it in the dictionary, `translate_apply.py` writes it back) and sets the variant's
+  `language` to `--target-lang`. Existing decks are unchanged until their `deck.json` gets a
+  `title`. Local mode and the AWS stack (SdpmRuntime, SdpmData).
+- **Moving between Decks, Styles and Templates no longer flashes the screen.** The rail and
+  the logo were plain links, so every move reloaded the page: the whole screen was drawn
+  again, the text showed in English for a moment before the chosen language, and the Cloud
+  Web UI went blank while it checked the sign-in. They now change pages in place. The rail
+  stays, and only the content changes, with a 150ms fade (none with reduced motion). Web UI
+  only (`deploy_webui.sh`).
+- **Chart XML follows the OOXML schema order** (#648). A chart's axis line, gridline and
+  background styling (`c:spPr`, `c:majorGridlines`) was appended as the last child of its
+  axis, plot area or chart space, out of schema order. PowerPoint accepts that, but strict
+  readers and validators can reject the file. It is now inserted at its schema position.
+  Local mode and the AWS stack (SdpmRuntime).
+- **A shape's `paragraphs` take the documented `list` key** (#586). `list: {"type": "disc"}`
+  was ignored on shapes, so the paragraph had no bullet; it now makes a bullet, and a
+  numbered `type` and `level` work as in a textbox. `bullet` still works as before. Local
+  mode and the AWS stack (SdpmRuntime).
+- **`lineOpacity` works on shapes** (#586). It was documented for shapes but only applied
+  to freeforms, so a shape's outline stayed opaque. It is now applied, and `pptx_to_json`
+  reads it back from a shape's outline as it does from a freeform's. Local mode and the
+  AWS stack (SdpmRuntime).
+- **An image's border survives `pptx_to_json`** (#586). The builder draws `line` /
+  `lineWidth` on an image, but the converter did not read them back, so the border was
+  lost when the deck was read and built again. Local mode and the AWS stack (SdpmRuntime).
+
+## [0.19.0] - 2026-11-18
+
+The Web UI is laid out anew. It has a left rail and a home screen that is the chat, with
+the deck list below it. A deck's name, steps and tools share one row above the slides,
+which get about 870px instead of 660px at 1440px. The `/` picker and the new Style and
+Template chips show style covers and template themes. The chat keeps one conversation per
+screen. SDPM gets its own icon, in the Web UI, the favicon, the PWA and the Claude Desktop
+bundle. Charts gain a radar type, and `deploy.sh` checks who owns its source bucket.
+
+### Upgrading from 0.18
+
+**Cloud deployments.**
+
+- Deploy all stacks (`scripts/deploy.sh`), in any order, and the Web UI
+  (`scripts/deploy_webui.sh`). Nothing in `infra/config.yaml` changes.
+- `deploy.sh` now uploads to a new source bucket, `sdpm-deploy-<account>-<region>-an`,
+  and creates it on its first run (AWS CLI v2 2.34.8 or later). Keep the old
+  `sdpm-deploy-<account>-<region>` bucket until every copy of `deploy.sh` you run is
+  updated, then delete it; see
+  [Deploy Guide — Source bucket](docs/en/deploy-cloudshell.md#source-bucket).
+
+### Added
+
+- **Radar charts** (`chartType: "radar"`, #621). A radar chart takes the same categories and
+  series as a line chart; `markers` (default on), series `color`, `style.lineWidth` /
+  `style.markerSize` and `valueAxis` (`min` / `max` / `majorUnit` / `gridlines`, the radial
+  scale) work as for `line`. `pptx_to_json` reads a radar chart back as `radar`, so an
+  edited one is rebuilt from its JSON; a filled radar chart still keeps its `_chartXml`.
+  New `chart-radar` guide. Local mode and the AWS stack (SdpmRuntime).
+- **An SDPM icon.** A slide frame holding a green and an amber face, with a violet block
+  tilting in over its top-left corner. The Web UI uses it for the logo at the top of the
+  rail (the mobile top bar too, drawn without a tile and following the dark/light theme),
+  the favicon (also without a tile, so it fills the browser tab; the SVG favicon follows the
+  dark/light colour scheme), `icon.svg` and the PWA icons, which were blank squares before.
+  The Claude Desktop bundle (`sdpm.mcpb`) now carries it as its icon. Web UI
+  (`deploy_webui.sh`) and the next release's bundle.
+
 ### Security
 
+- **deploy.sh: the source bucket is account-scoped and its owner is checked.** `deploy.sh`
+  uploads the CodeBuild source to `sdpm-deploy-<account>-<region>-an` in the S3 account
+  regional namespace and passes `--expected-bucket-owner` on every call to that bucket. It
+  stops before uploading when the bucket belongs to another account or cannot be created
+  there (creating it needs AWS CLI v2 2.34.8 or later; the namespace is not available in
+  Middle East (Bahrain) and Middle East (UAE)). A bucket it creates gets all four Block Public
+  Access settings and a 7-day expiry for source zips. Deployed stacks are unaffected and need
+  no redeploy; the next run creates the new bucket. Keep the old `sdpm-deploy-<account>-<region>`
+  bucket until every copy of `deploy.sh` you run is updated, then delete it. See
+  [Deploy Guide — Source bucket](docs/en/deploy-cloudshell.md#source-bucket) for how to check it.
+
+### Changed
+
+- **The Web UI is laid out anew: a left rail, a home screen that is the chat, and a one-row
+  deck bar.** Decks, Styles and Templates move to a rail on the left (a top bar on phones),
+  with Settings as a gear at its foot; the user menu (name, sign out) is a Cloud-only item
+  below it. The home screen opens on "What are we presenting?" with the chat input in the
+  middle; under it, dashed Style and Template chips open a gallery of style covers and
+  template themes, and choosing one puts the same `@style:` / `@template:` token in the
+  input that `/` does. Once a conversation starts it fills the first screenful, with the deck
+  list below it, until it creates a deck; the conversation then moves into the chat sheet
+  beside the deck, its height and width animated rather than swapped. A deck's name, its
+  steps (brief, art direction, outline, slides) as a progress track, and its tools share one
+  row above the slides, so the slides get about 870px instead of 660px at 1440px with the
+  chat open. The `/` picker is the same card gallery as the chips: up to 640px wide
+  whatever the input's width, opening over the deck beside the chat sheet, with All /
+  Template / Style / Format buttons (they rewrite `/sty` as `/style sty`) and arrow keys in
+  all four directions. Text, surfaces and borders get more contrast steps (WCAG AA for
+  secondary text), on a warm charcoal dark theme and the matching light one. Web UI only
+  (`deploy_webui.sh`).
+- **The chat has one conversation per screen; the New and deck tabs are gone.** The home
+  screen's conversation stays while you open decks and come back, and only New chat clears
+  it; a deck's sheet shows that deck's conversation only. The rail's chat button is gone
+  too: with the sheet closed, Chat at the right of the deck bar opens it again. Web UI only.
+
+### Fixed
+
+- **Phones: the chat button no longer opens the side sheet over a deck's preview tab, and
+  switching to the chat tab keeps the home conversation.** The header button marked the
+  sheet open while the chat tab was showing, so it slid in, 440px wide, over the preview;
+  the chat tab used a second chat panel, which dropped the home conversation (and one that
+  had just created the deck) while it was shown. Web UI only.
+
+## [0.18.0] - 2026-11-15
+
+Japanese decks read more naturally: a `writing-ja` guide that the orchestrator and composers
+read for a Japanese deck, and CJK↔Latin spacing that leaves Japanese punctuation, quotes
+and apostrophes alone, gives styled text the same spaces as plain text, and now also
+covers HTML decks and chart text. The MCP servers move to MCP Python SDK 2.x. Built PPTX
+files carry accessibility metadata, the Local Web UI keeps its reads and writes inside
+its data directories, and XML from outside the repository goes through one explicit parser.
+
+### Upgrading from 0.17
+
+**Cloud deployments.**
+
+- Deploy all stacks (`scripts/deploy.sh`), in any order. The Web UI
+  (`scripts/deploy_webui.sh`) changes only in its dependencies. Nothing in
+  `infra/config.yaml` changes.
+
+### Security
+
+- **Local Web UI file access stays inside its data directories after symlinks are
+  resolved.** The preview, deck list, deck detail, PPTX download, template download, style
+  detail, change request and "open in app" endpoints, and the deck's chat files (`.session`,
+  `.session-engine`, `.session-origin.json`, `.chat.json`), check the real path of both the
+  data directory and the file, with a separator boundary, through one shared helper. A
+  symlink leading out of the deck root, the templates or the styles directory is refused the
+  same way as any other path outside it, for reads and for the chat-file and change-request
+  writes; a file that does not exist yet is created only where its directory resolves inside.
+  Files inside, including symlinks that stay inside, are served as before. User templates
+  are now also found when the config directory itself is reached through a symlink.
+  Saving an outline, a user style or template, an attachment, or the deck index checks the
+  directory and the file the same way before anything is written, so a symlink leading out
+  of the data directory is refused (400) instead of written through. Template rename
+  validates the source name too. Local mode only.
 - **One explicit XML parser for content from outside the repository.** Template and
   imported PPTX parts, the XML fragments a slide JSON carries for round trips, and SVG
   files are parsed through `sdpm.utils.xml_safe`, which states its settings instead of
@@ -49,16 +239,6 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   SVG and MathML and attribute values are left as written, and the slide files are not
   changed. `"autoSpacing": false` in deck.json turns it off, as for PPTX. Local mode and the
   AWS stack (SdpmRuntime).
-- **Local Web UI file access stays inside its data directories after symlinks are
-  resolved.** The preview, deck list, deck detail, PPTX download, template download, style
-  detail, change request and "open in app" endpoints, and the deck's chat files (`.session`,
-  `.session-engine`, `.session-origin.json`, `.chat.json`), check the real path of both the
-  data directory and the file, with a separator boundary, through one shared helper. A
-  symlink leading out of the deck root, the templates or the styles directory is refused the
-  same way as any other path outside it, for reads and for the chat-file and change-request
-  writes; a file that does not exist yet is created only where its directory resolves inside.
-  Files inside, including symlinks that stay inside, are served as before. User templates
-  are now also found when the config directory itself is reached through a symlink.
 - **Accessibility metadata in built PPTX files.** Any element takes `alt` (written as the
   shape's alt text, `p:cNvPr@descr`) or `decorative: true` (PowerPoint's "Mark as
   decorative"), so images, icons, charts, tables and videos can pass PowerPoint's
@@ -96,6 +276,15 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ### Fixed
 
+- **Fixed paragraph line spacing survives a rebuild.** `pptx_to_json` wrote a textbox
+  paragraph's fixed line spacing as `lineSpacing` (1/100 pt), a key the builder did not
+  read, so the spacing was lost when the JSON was built again. Paragraphs now use
+  `lineSpacingPt` in pt, the same key and unit as element-level fixed spacing, in both the
+  converter and the builder. JSON with the old `lineSpacing` key still builds (#586).
+  `lineSpacingPt` wins over `lineSpacingPct` at both levels, and a paragraph's own spacing
+  wins over the element's: a paragraph no longer gets two `a:lnSpc` (which PowerPoint may
+  offer to repair) when both levels set one.
+  Local mode and the AWS stack (SdpmRuntime).
 - **A background compose that ends as the work stops is always reported.** When a
   compose was cancelled (Stop) or finished just as the session checked whether anything was
   still running, the session could go idle without its `taskEnd`: the compose card stayed
@@ -2487,7 +2676,9 @@ decks and cloud data keep working. See the
 - Initial release: spec-driven slide generation (Engine json ↔ pptx, CLI,
   local/remote MCP servers, Strands Agent, React Web UI, CDK stacks)
 
-[Unreleased]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.17.0...HEAD
+[Unreleased]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.19.0...HEAD
+[0.19.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.18.0...v0.19.0
+[0.18.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.14.0...v0.15.0

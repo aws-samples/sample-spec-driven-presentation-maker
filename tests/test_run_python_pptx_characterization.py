@@ -11,6 +11,7 @@ the result the agent sees sits in the ``_assert_*_format`` helpers.
 from __future__ import annotations
 
 import importlib.util
+import io
 import json
 import os
 import re
@@ -213,7 +214,7 @@ def test_remote_edit_with_measure(remote):
     [pptx_key] = storage.keys("pptx/d1/")
     assert storage.objects[pptx_key][:2] == b"PK"
     assert storage.updates[-1]["pptxS3Key"] == pptx_key and storage.updates[-1]["slideCount"] == 3
-    assert storage._s3.deleted == ["pptx/d1/old.pptx"]
+    assert set(storage._s3.deleted) == {"pptx/d1/old.pptx", "pptx/d1/old.nonotes.pptx"}
 
     # Previews of the rendered slugs, compose for the rendered slugs plus every slug
     # without compose yet; never for a slide whose layout fell back.
@@ -272,6 +273,33 @@ def test_remote_edit_without_measure(remote):
     assert "measure" not in out and "warnings" not in out and "errors" not in out
     assert storage.keys("pptx/d1/")
     assert "body" in out["previewHint"]
+
+
+def test_remote_speaker_notes_markdown_uploads_the_notes_like_generate_pptx(remote):
+    from pptx import Presentation
+
+    run, storage, office = remote
+    storage.objects["decks/d1/deck.json"] = json.dumps(
+        {"template": "", "defaultTextColor": "#FFFFFF", "speakerNotes": "markdown"}).encode()
+    out = run({"slides/cover.json": {**SLIDES["cover"], "notes": "Say hello."}})
+    assert "pptx_error" not in out
+
+    keys = storage.keys("pptx/d1/")
+    [pptx_key] = [k for k in keys if k.endswith(".pptx")]
+    [notes_key] = [k for k in keys if k.endswith(".notes.md")]
+    assert notes_key == pptx_key[: -len(".pptx")] + ".notes.md"
+    assert storage.record["pptxS3Key"] == pptx_key and storage.record["notesS3Key"] == notes_key
+    assert "Say hello." in storage.objects[notes_key].decode()
+    prs = Presentation(io.BytesIO(storage.objects[pptx_key]))
+    assert not any(slide.has_notes_slide for slide in prs.slides)
+
+    # Back to "pptx": the record stops pointing at notes and the old notes are deleted.
+    storage.objects["decks/d1/deck.json"] = json.dumps({"template": "", "defaultTextColor": "#FFFFFF"}).encode()
+    out = run({"slides/cover.json": {**SLIDES["cover"], "notes": "Say hello again."}})
+    assert "pptx_error" not in out
+    assert storage.record["notesS3Key"] is None
+    assert notes_key in storage._s3.deleted and pptx_key in storage._s3.deleted
+    assert not [k for k in storage.keys("pptx/d1/") if k.endswith(".notes.md")]
 
 
 def test_remote_measure_of_an_unknown_slug(remote):

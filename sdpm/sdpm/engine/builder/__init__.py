@@ -76,7 +76,7 @@ class PPTXBuilder(
     def __init__(self, template_path: Path, custom_template: bool = False,
                  fonts: dict = None, base_dir: Path = None, keep_empty_placeholders: bool = False,
                  default_text_color: str = None, auto_spacing: bool = True,
-                 default_background: str = None):
+                 default_background: str = None, write_notes: bool = True):
         """Initialize PPTXBuilder.
 
         Args:
@@ -90,6 +90,8 @@ class PPTXBuilder(
             default_background: Solid background applied to every slide that does
                    not set its own "background" (deck.json "defaultBackground").
                    None keeps the template background.
+            write_notes: Write each slide's "notes" as speaker notes. False leaves
+                   them out of the .pptx (deck.json "speakerNotes" "markdown").
 
         Raises:
             ValueError: If fonts or default_text_color is not provided.
@@ -122,6 +124,7 @@ class PPTXBuilder(
         self.custom_template = custom_template
         self.fonts = fonts
         self.auto_spacing = auto_spacing  # CJK↔Latin spacing; False = keep source text verbatim
+        self.write_notes = write_notes  # False: slide "notes" stay out of the .pptx
         self.keep_empty_placeholders = keep_empty_placeholders
         self.layouts = self._build_layout_map()
         self.invalid_layouts: list[dict] = []  # {"slug", "attempted", "used", "available"}
@@ -385,7 +388,7 @@ class PPTXBuilder(
                     sp_tree.insert(back_cursor, node)
                     back_cursor += 1
 
-        if "notes" in slide_def:
+        if "notes" in slide_def and self.write_notes:
             notes_frame = slide.notes_slide.notes_text_frame
             if notes_frame is not None:
                 notes_frame.clear()

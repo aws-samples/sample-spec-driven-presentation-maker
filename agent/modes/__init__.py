@@ -72,6 +72,12 @@ _STYLE_TOOLS = [
     "run_style_python", "list_styles", "analyze_template", "read_attachment",
 ]
 
+# The deck.json field reference start_presentation returns with the role document:
+# deck-independent, so it sits before the cache point and is cached with it.
+_DECK_SPEC = Part(
+    Source.mcp("start_presentation", {}, pick="static.deck_spec"), target="system", label="deck-json-spec",
+)
+
 _INTERACTION_DIALOGUE = Part(Source.file("wiring/interaction_dialogue"), target="system")
 _INTERACTION_FAST = Part(Source.file("wiring/interaction_fast"), target="system")
 
@@ -82,6 +88,7 @@ def _orchestrator(*wiring: Part, use_composer: bool = True, **overrides) -> Mode
         parts=[
             _COMMON_LANGUAGE,
             _role("start_presentation"),
+            _DECK_SPEC,
             *wiring,
             _COMMON_ATTACHMENTS,
             *([_WIRING_COMPOSE_REPORT] if use_composer else []),

@@ -80,7 +80,10 @@ export async function GET() {
         }
       }
       const hasPptx = !isHtml && fs.existsSync(path.join(dp, "output.pptx"))
-      return { deckId, name, slideCount, updatedAt: new Date().toISOString(), thumbnailUrl, hasPptx }
+      // How output.pptx holds its speaker notes: a full build with speakerNotes "markdown"
+      // writes output.notes.md beside it, a full "pptx" build removes that file.
+      const speakerNotes = hasPptx && fs.existsSync(path.join(dp, "output.notes.md")) ? "markdown" : "pptx"
+      return { deckId, name, slideCount, updatedAt: new Date().toISOString(), thumbnailUrl, hasPptx, speakerNotes }
     })
     .sort((a, b) => b.deckId.localeCompare(a.deckId))
 

@@ -78,6 +78,30 @@ describe("ChatInput slash picker", () => {
     expect(textarea.closest("form")?.hasAttribute("data-landed")).toBe(true)
   })
 
+  it("moves through the gallery with left/right as well as up/down", () => {
+    const { textarea } = renderInput()
+
+    changeValue(textarea, "/")
+    fireEvent.keyDown(textarea, { key: "ArrowRight" })
+    expect(textarea.getAttribute("aria-activedescendant")).toMatch(/-opt-1$/)
+    fireEvent.keyDown(textarea, { key: "ArrowLeft" })
+    expect(textarea.getAttribute("aria-activedescendant")).toMatch(/-opt-0$/)
+  })
+
+  it("narrows to a kind by rewriting the slash fragment", () => {
+    const raf = vi.spyOn(window, "requestAnimationFrame").mockImplementation((cb) => { cb(0); return 0 })
+    const { textarea } = renderInput()
+
+    changeValue(textarea, "/lu")
+    fireEvent.click(screen.getByRole("button", { name: "Style" }))
+    expect(textarea.value).toBe("/style lu")
+    expect(screen.getByRole("button", { name: "Style" }).getAttribute("aria-pressed")).toBe("true")
+
+    fireEvent.click(screen.getByRole("button", { name: "All" }))
+    expect(textarea.value).toBe("/lu")
+    raf.mockRestore()
+  })
+
   it("closes on Escape and does not reopen for the same slash fragment", () => {
     const { textarea } = renderInput()
 

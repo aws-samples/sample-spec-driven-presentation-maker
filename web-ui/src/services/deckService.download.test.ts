@@ -37,6 +37,20 @@ describe("downloadDeckPptx", () => {
     expect(document.querySelector("a[download]")).toBeNull()
   })
 
+  it("asks for the copy without speaker notes", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ url: PRESIGNED, expiresIn: 900 })))
+    vi.stubGlobal("fetch", fetchMock)
+    await downloadDeckPptx("d 1", "tok", { withNotes: false })
+    expect(fetchMock).toHaveBeenCalledWith("https://api.example/prod/decks/d%201/pptx?notes=without", {
+      headers: { Authorization: "Bearer tok" },
+    })
+    await downloadDeckPptx("d 1", "tok", { withNotes: true })
+    expect(fetchMock).toHaveBeenLastCalledWith("https://api.example/prod/decks/d%201/pptx", {
+      headers: { Authorization: "Bearer tok" },
+    })
+    expect(clicked).toEqual([PRESIGNED, PRESIGNED])
+  })
+
   it("throws and downloads nothing when the deck has no PPTX", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ error: "PPTX not built yet" }), { status: 404 })))
     await expect(downloadDeckPptx("d1", "tok")).rejects.toThrow("404")

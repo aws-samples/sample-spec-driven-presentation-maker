@@ -270,7 +270,7 @@ def _lint_image(si: int, ei: int, elem: dict) -> list[dict]:
 # chart
 # ===================================================================
 
-_CHART_TYPES = {"bar", "line", "pie", "donut"}
+_CHART_TYPES = {"bar", "line", "pie", "donut", "radar", "area"}
 
 
 def _lint_chart(si: int, ei: int, elem: dict) -> list[dict]:
@@ -278,7 +278,7 @@ def _lint_chart(si: int, ei: int, elem: dict) -> list[dict]:
     ct = elem.get("chartType")
     if ct is None:
         results.append(_diag(si, ei, "chart-missing-chartType",
-                             "chart element has no 'chartType'. Specify bar, line, pie, or donut."))
+                             "chart element has no 'chartType'. Specify bar, line, pie, donut, radar, or area."))
     elif ct not in _CHART_TYPES:
         results.append(_diag(si, ei, "chart-invalid-chartType",
                              f"chartType '{ct}' is not valid. Allowed: {sorted(_CHART_TYPES)}"))
@@ -301,9 +301,9 @@ def _lint_chart(si: int, ei: int, elem: dict) -> list[dict]:
     if elem.get("holeSize") is not None and ct != "donut":
         results.append(_diag(si, ei, "chart-holeSize-wrong-type",
                              f"holeSize is only valid for chartType 'donut', not '{ct}'."))
-    if elem.get("stacked") and ct not in ("bar", None):
+    if elem.get("stacked") and ct not in ("bar", "area", None):
         results.append(_diag(si, ei, "chart-stacked-wrong-type",
-                             f"stacked is only valid for chartType 'bar', not '{ct}'."))
+                             f"stacked is only valid for chartType 'bar' or 'area', not '{ct}'."))
 
     results.extend(_lint_bbox_required(si, ei, elem, "chart"))
     if chart_edit_ignored(elem):

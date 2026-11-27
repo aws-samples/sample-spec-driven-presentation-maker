@@ -96,6 +96,26 @@ def _file_parts(mode):
     return [str(p.source.value) for p in MODES[mode].parts if p.source.type == "file"]
 
 
+@pytest.mark.parametrize("mode", ["orchestrator", "vibe", "spec"])
+def test_orchestrator_system_carries_deck_spec_before_cache_point(mode):
+    """The deck.json reference is deck-independent: system, inside the cached prefix."""
+    parts = MODES[mode].parts
+    cache_idx = max(i for i, p in enumerate(parts) if p.cache_point)
+    spec = [i for i, p in enumerate(parts)
+            if p.source.type == "mcp" and p.source.value == "start_presentation" and p.source.pick == "static.deck_spec"]
+    assert len(spec) == 1 and spec[0] < cache_idx
+    assert parts[spec[0]].target == "system"
+
+
+def test_orchestrator_system_prompt_includes_deck_spec():
+    client = ContractFakeMCPClient()
+    system_prompt, _messages = resolve_parts(
+        MODES["orchestrator"].parts, mcp_client=client, context={}, enable_cache=False,
+    )
+    assert contract.start_presentation()["static"]["deck_spec"] in system_prompt
+    assert [name for name, _ in client.calls].count("start_presentation") == 1
+
+
 @pytest.mark.parametrize("mode,token", [
     ("vibe", "wiring/interaction_fast"),
     ("spec", "wiring/interaction_dialogue"),

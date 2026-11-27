@@ -5,6 +5,7 @@ import fs from "fs"
 import path from "path"
 import { execFileSync } from "child_process"
 import { getUserConfigDir, getState, updateState, SDPM_ROOT } from "@/lib/local/sdpmPaths"
+import { resolveWithin } from "@/lib/local/contained"
 import { rejectCrossSite } from "@/lib/local/requestGuard"
 
 /** servers/local directory (uv-managed venv with sdpm deps). */
@@ -33,9 +34,9 @@ export async function POST(req: Request) {
   const dir = getUserTemplatesDir()
   fs.mkdirSync(dir, { recursive: true })
 
-  const realDir = fs.realpathSync(dir)
-  const outputPath = path.resolve(realDir, `${name}.pptx`)
-  if (!outputPath.startsWith(realDir + path.sep)) {
+  // Refuses a target that is a symlink leading out of the templates directory (or a dangling one).
+  const outputPath = resolveWithin(dir, `${name}.pptx`)
+  if (!outputPath) {
     return Response.json({ error: "Invalid template name" }, { status: 400 })
   }
 

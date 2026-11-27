@@ -19,14 +19,14 @@
 
 "use client"
 
-import { useState, useRef, useCallback, useEffect, useMemo } from "react"
+import { useState, useRef, useCallback, useEffect, useLayoutEffect, useMemo } from "react"
 import { useAuth } from "@/hooks/useAuth"
 import { AppShell } from "@/components/AppShell"
 import { DeckListView, visibleDecks } from "@/components/deck/DeckListView"
 import { SlideCarousel } from "@/components/deck/SlideCarousel"
 import { DeckActions } from "@/components/deck/DeckActions"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
-import { ChatPanelShell } from "@/components/chat/ChatPanelShell"
+import { ChatPanelShell, type ChatLayout } from "@/components/chat/ChatPanelShell"
 import { DeckFormatProvider } from "@/components/chat/DeckFormatContext"
 import { ChatPanelHandle } from "@/components/chat/ChatPanel"
 import { updateVisibility } from "@/services/deckService"
@@ -93,10 +93,46 @@ export default function DecksPage() {
     sendMessage: (text: string, options?: { displayContent?: string }) =>
       chatRef.current?.sendMessage(text, options) ?? Promise.resolve(),
   }), [agentIsLoading])
+  // Home screen: a blank chat is the composer at the top (stage); once it has messages the
+  // conversation fills the first screenful and the deck list follows below it (center).
+  // Starts as the stage, the shell's own first layout on the home screen, so the prerendered
+  // page already lays out the home screen (no deck-screen frame or New Deck until hydration).
+  const [chatLayout, setChatLayout] = useState<ChatLayout>("stage")
+  const pageLayout: ChatLayout = ws.isWorkspace ? "sheet" : chatLayout
+  const focusComposer = useCallback(() => chatRef.current?.focus(), [])
+  const openChatSheet = useCallback(() => ws.setChatOpen(true), [ws])
+  const mainRef = useRef<HTMLElement>(null)
+  const scrollToDecks = useCallback(() => mainRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), [])
+  // The page that opens beside the chat as it leaves the centre fades in after the move starts.
+  const [pageEnter, setPageEnter] = useState(false)
+  const prevPageLayoutRef = useRef(pageLayout)
+  useLayoutEffect(() => {
+    const prev = prevPageLayoutRef.current
+    prevPageLayoutRef.current = pageLayout
+    if (prev !== "center" || pageLayout !== "sheet") return
+    setPageEnter(true)
+    const timer = setTimeout(() => setPageEnter(false), 1200)
+    return () => clearTimeout(timer)
+  }, [pageLayout])
+  // Phones show a deck's chat and preview as two tabs; the side sheet never opens there.
+  const mobileTabs = isMobile && ws.isWorkspace && ws.canChat
+  // The chat tab's sheet starts below the tab bar.
+  const tabBarRef = useRef<HTMLDivElement>(null)
+  const [tabBarBottom, setTabBarBottom] = useState(96)
+  useLayoutEffect(() => {
+    const el = tabBarRef.current
+    if (!mobileTabs || !el) return
+    const measure = () => setTabBarBottom(Math.round(el.getBoundingClientRect().bottom))
+    measure()
+    window.addEventListener("resize", measure)
+    return () => window.removeEventListener("resize", measure)
+  }, [mobileTabs])
   const swipeRef = useSwipe(
     () => setActiveTab("preview"),
     () => setActiveTab("chat"),
   )
+  // The chat tab is the persistent shell over the page, so it takes its own swipe.
+  const chatSwipeRef = useSwipe(() => setActiveTab("preview"), () => {})
 
   /* ── Comment tool: one state for the preview and the chat ── */
   const reviewDeckId = ws.isWorkspace ? (ws.isNew ? (ws.createdDeckId ?? null) : ws.activeDeckId) : null
@@ -105,8 +141,8 @@ export default function DecksPage() {
     () => (deckSlides ?? []).filter((s) => s.previewUrl || s.composeUrl).map((s) => s.slug),
     [deckSlides],
   )
-  const { setChatOpen, setChatTab } = ws
-  const openReviewChat = useCallback(() => { setChatOpen(true); setChatTab("deck") }, [setChatOpen, setChatTab])
+  const { setChatOpen } = ws
+  const openReviewChat = useCallback(() => setChatOpen(true), [setChatOpen])
 
   /** Handle inline style selection — insert a `@style:<name>` token into chat input. */
   const handleStyleSelect = useCallback((name: string) => {
@@ -133,16 +169,25 @@ export default function DecksPage() {
     <AppShell
       deckName={ws.isWorkspace && ws.deck ? ws.deck.name : undefined}
       onBack={ws.isWorkspace ? ws.navigateToList : undefined}
-      chatOpen={ws.chatOpen}
-      onChatToggle={() => ws.setChatOpen((prev) => !prev)}
+      onNavDecks={pageLayout === "center" ? scrollToDecks : undefined}
     >
-      <div className="flex-1 overflow-hidden relative sm:flex">
-        <main className="h-full overflow-y-auto flex-1 min-w-0">
+      <div className={
+        pageLayout === "stage" ? "flex-1 overflow-y-auto relative flex flex-col"
+          : pageLayout === "center" ? "flex-1 overflow-y-auto relative flex flex-col"
+            : "flex-1 overflow-hidden relative sm:flex"
+      }>
+        <main
+          ref={mainRef}
+          className={
+            pageLayout === "sheet" ? `h-full overflow-y-auto flex-1 min-w-0 ${pageEnter ? "page-enter" : ""}`
+              : "flex-none min-w-0"
+          }
+        >
           {ws.isWorkspace ? (
             <>
               {/* Mobile tab bar */}
-              {ws.canChat && isMobile && (
-                <div className="flex border-b border-border">
+              {mobileTabs && (
+                <div ref={tabBarRef} className="flex border-b border-border">
                   <button
                     onClick={() => setActiveTab("chat")}
                     className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-medium transition-colors ${
@@ -167,25 +212,9 @@ export default function DecksPage() {
 
               {/* Workspace: slide preview */}
               <div ref={isMobile ? swipeRef : undefined} className="h-full">
-                {isMobile && ws.canChat && activeTab === "chat" ? (
-                  /* Mobile chat tab — ChatPanelShell renders inline on mobile */
-                  <DeckFormatProvider value={ws.deck?.outputFormat}>
-                  <ChatPanelShell
-                    open={true}
-                    onClose={() => setActiveTab("preview")}
-                    chatTab={ws.chatTab}
-                    onChatTabChange={ws.setChatTab}
-                    chatRef={chatRef}
-                    deckId={ws.isWorkspace ? (ws.isNew ? (ws.createdDeckId ?? null) : ws.activeDeckId) : null}
-                    deckName={ws.deck?.name || null}
-                    chatSessionId={ws.deck?.chatSessionId}
-                    sessionOrigin={ws.deck?.sessionOrigin}
-                    onDeckCreated={ws.handleDeckCreated} onPreviewInvalidated={() => ws.setPptxRequested(true)}
-                    onWorkflowPhase={setWorkflowPhase}
-                    onLoadingChange={setAgentIsLoading}
-                    inline
-                  />
-                  </DeckFormatProvider>
+                {mobileTabs && activeTab === "chat" ? (
+                  /* Phone chat tab: the persistent ChatPanelShell below fills the screen under the tab bar */
+                  <div className="h-full" />
                 ) : (
                   // Local: defer SlideCarousel mount until deck data loads so
                   // hadSlidesOnMount captures the real slide count, not the
@@ -203,6 +232,7 @@ export default function DecksPage() {
                     htmlUrl={ws.deck?.htmlUrl}
                     slideSize={ws.deck?.slideSize}
                     scriptWarnings={ws.deck?.scriptWarnings}
+                    speakerNotes={ws.deck?.speakerNotes}
                     isLoading={ws.waitingForPng || false}
                     scrollToSlide={ws.scrollToSlide}
                     onScrollComplete={() => ws.setScrollToSlide("")}
@@ -213,6 +243,7 @@ export default function DecksPage() {
                     currentTemplate={ws.deck?.template}
                     idToken={idToken}
                     ownerAlias={!ws.isOwner ? ws.deck?.ownerAlias : undefined}
+                    onOpenChat={!isMobile && !ws.chatOpen ? () => ws.setChatOpen(true) : undefined}
                     headerActions={
                       ws.activeDeckId && !ws.isNew ? (
                         <div className="flex items-center gap-1.5">
@@ -259,7 +290,8 @@ export default function DecksPage() {
                 searchResults={list.searchResults}
                 searching={list.searching}
                 onDeckOpen={ws.openDeck}
-                onNewDeck={() => { ws.setChatOpen(true); ws.setChatTab("new") }}
+                onNewDeck={focusComposer}
+                showNewDeck={pageLayout === "sheet"}
                 favoriteIds={list.favoriteIds}
                 onToggleFavorite={list.handleToggleFavorite}
                 onDelete={list.handleDelete}
@@ -281,25 +313,25 @@ export default function DecksPage() {
           )}
         </main>
 
-        {/* Chat Panel (persistent, desktop) — hidden on mobile workspace chat tab */}
-        {!(isMobile && ws.isWorkspace && ws.canChat && activeTab === "chat") && (
-          <DeckFormatProvider value={ws.deck?.outputFormat}>
+        {/* Chat Panel — one instance on every screen (on a phone's deck screen it is the chat tab) */}
+        <DeckFormatProvider value={ws.deck?.outputFormat}>
           <ChatPanelShell
-            open={ws.chatOpen}
-            onClose={() => ws.setChatOpen(false)}
-            chatTab={ws.chatTab}
-            onChatTabChange={ws.setChatTab}
+            open={mobileTabs ? activeTab === "chat" : ws.chatOpen}
+            onClose={mobileTabs ? () => setActiveTab("preview") : () => ws.setChatOpen(false)}
+            phoneTop={mobileTabs ? tabBarBottom : undefined}
+            swipeRef={mobileTabs ? chatSwipeRef : undefined}
             chatRef={chatRef}
             deckId={ws.isWorkspace ? (ws.isNew ? (ws.createdDeckId ?? null) : ws.activeDeckId) : null}
-            deckName={ws.deck?.name || null}
             chatSessionId={ws.deck?.chatSessionId}
             sessionOrigin={ws.deck?.sessionOrigin}
             onDeckCreated={ws.handleDeckCreated} onPreviewInvalidated={() => ws.setPptxRequested(true)}
             onWorkflowPhase={setWorkflowPhase}
             onLoadingChange={setAgentIsLoading}
+            stageAllowed={!ws.isWorkspace}
+            onLayoutChange={setChatLayout}
+            onStageExit={openChatSheet}
           />
           </DeckFormatProvider>
-        )}
       </div>
 
       <ConfirmDialog
@@ -322,14 +354,14 @@ export default function DecksPage() {
         onConfirm={handleConfirmBulkDelete}
       />
 
-      {isMobile && !ws.isWorkspace && (
+      {isMobile && !ws.isWorkspace && pageLayout === "sheet" && (
         <div className="fixed right-4 z-40" style={{ bottom: "calc(1.5rem + env(safe-area-inset-bottom, 0px))" }}>
           {fabOpen && (
             <>
               <div className="fixed inset-0 z-30" onClick={() => setFabOpen(false)} />
               <div className="absolute bottom-16 right-0 z-40 flex flex-col gap-2 items-end">
                 <button
-                  onClick={() => { setFabOpen(false); ws.setChatOpen(true); ws.setChatTab("new") }}
+                  onClick={() => { setFabOpen(false); focusComposer() }}
                   className="team-action-btn team-entry-btn flex items-center gap-2 min-h-11 px-4 py-2.5 rounded-full text-sm font-medium animate-card-in"
                 >
                   <Plus className="h-4 w-4" />

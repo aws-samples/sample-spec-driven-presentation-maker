@@ -237,16 +237,17 @@ class TestShapeText:
         assert ps[1]._p.pPr.find(f"{_A}buChar").get("char") == "–"
         assert ps[2]._p.find(f"{_A}endParaRPr").get("sz") == "2000"
 
-    @pytest.mark.xfail(strict=True, reason="shape paragraphs read 'bullet'; the documented "
-                       "key is list: {type: disc} (slide-json-elements.md), which is ignored")
     def test_documented_paragraph_list_makes_a_bullet(self, tmp_path):
         (sp,) = _built_shapes(tmp_path, [_shape(paragraphs=[
-            {"text": "Body", "list": {"type": "disc"}}])])
-        assert sp.text_frame.paragraphs[0]._p.pPr is not None
-        assert sp.text_frame.paragraphs[0]._p.pPr.find(f"{_A}buChar") is not None
+            {"text": "Body", "list": {"type": "disc"}},
+            {"text": "Step 1", "list": {"type": "arabicPeriod", "level": 1}},
+        ])])
+        ps = sp.text_frame.paragraphs
+        assert ps[0]._p.pPr is not None
+        assert ps[0]._p.pPr.find(f"{_A}buChar") is not None
+        assert ps[1].level == 1
+        assert ps[1]._p.pPr.find(f"{_A}buAutoNum").get("type") == "arabicPeriod"
 
-    @pytest.mark.xfail(strict=True, reason="lineOpacity is documented for shape but only "
-                       "applied to freeforms")
     def test_line_opacity(self, tmp_path):
         assert _one(tmp_path, _shape(line="#FFFFFF", lineOpacity=0.5)).get("lineOpacity") == 0.5
 
@@ -451,13 +452,38 @@ class TestTextboxParagraphs:
             tags = _tags(p._p.pPr)
             assert tags[0] == "lnSpc", tags
 
-    @pytest.mark.xfail(strict=True, reason="the converter writes fixed paragraph line spacing "
-                       "as 'lineSpacing' (1/100 pt), which the builder does not read")
     def test_fixed_line_spacing_survives_a_second_build(self, tmp_path):
         first = _one(tmp_path / "a", _textbox(text="one\ntwo", lineSpacingPt=24))
+        assert [p["lineSpacingPt"] for p in first["paragraphs"]] == [24.0, 24.0]
         (sp,) = _built_shapes(tmp_path / "b", [first])
         p_pr = sp.text_frame.paragraphs[0]._p.pPr
         assert p_pr is not None and p_pr.find(f"{_A}lnSpc/{_A}spcPts") is not None
+        assert p_pr.find(f"{_A}lnSpc/{_A}spcPts").get("val") == "2400"
+
+    def test_fixed_spacing_wins_over_percent_at_both_levels(self, tmp_path):
+        both = {"lineSpacingPt": 24, "lineSpacingPct": 150000}
+        (elem_sp, para_sp) = _built_shapes(tmp_path, [
+            _textbox(text="x", **both),
+            _textbox(paragraphs=[{"text": "x", **both}]),
+        ])
+        for sp in (elem_sp, para_sp):
+            ln = sp.text_frame.paragraphs[0]._p.pPr.findall(f"{_A}lnSpc")
+            assert [(c.tag, c.get("val")) for c in ln[0]] == [(f"{_A}spcPts", "2400")]
+
+    def test_paragraph_spacing_wins_over_the_element_and_is_written_once(self, tmp_path):
+        (sp,) = _built_shapes(tmp_path, [_textbox(lineSpacingPt=30, paragraphs=[
+            {"text": "own", "lineSpacingPt": 24}, {"text": "inherits"}])])
+        own, inherits = sp.text_frame.paragraphs
+        own_ln = own._p.pPr.findall(f"{_A}lnSpc")
+        assert len(own_ln) == 1 and own_ln[0][0].get("val") == "2400"
+        inherits_ln = inherits._p.pPr.findall(f"{_A}lnSpc")
+        assert len(inherits_ln) == 1 and inherits_ln[0][0].get("val") == "3000"
+
+    def test_legacy_paragraph_line_spacing_key_still_builds(self, tmp_path):
+        # Older pptx_to_json output wrote fixed spacing as "lineSpacing" (1/100 pt).
+        (sp,) = _built_shapes(tmp_path, [_textbox(paragraphs=[{"text": "x", "lineSpacing": 2400}])])
+        p_pr = sp.text_frame.paragraphs[0]._p.pPr
+        assert p_pr.find(f"{_A}lnSpc/{_A}spcPts").get("val") == "2400"
 
 
 class TestTextboxBox:
@@ -680,11 +706,11 @@ class TestImageProperties:
         assert str(pic.line.color.rgb) == "00FF00"
         assert pic.line.width.pt == 2.0
 
-    @pytest.mark.xfail(strict=True, reason="picture borders are not extracted by the converter")
     def test_border_survives(self, tmp_path):
         out = _one(tmp_path, _image(_png(tmp_path / "p.png"), width=200, height=100,
                                     line="#00FF00", lineWidth=2))
         assert out.get("line") == "#00FF00"
+        assert out.get("lineWidth") == 2.0
 
     def test_icon_color_on_raster_warns(self, tmp_path, capsys):
         _built_shapes(tmp_path, [_image(_png(tmp_path / "p.png"), width=20, iconColor="#FF0000")])

@@ -85,6 +85,25 @@ class TestStartPresentation:
         for html_only in ("ECharts", "D3", "deck.css", "fragment", "preview/png", "slider"):
             assert html_only not in wf, html_only
 
+    def test_static_carries_the_deck_json_spec(self):
+        from sdpm.config import REFERENCES_DIR
+        from sdpm.knowledge.reference import read_docs
+
+        r = tools.start_presentation()
+        assert set(r["static"]) == {"workflow", "deck_spec"}
+        spec = r["static"]["deck_spec"]
+        assert spec == read_docs(REFERENCES_DIR / "guides", ["deck-json-spec"])[0]["content"]
+        for field in ("template", "fonts", "defaultTextColor", "defaultBackground", "slideSize",
+                      "outputFormat", "title", "language", "speakerNotes", "autoSpacing"):
+            assert f"`{field}`" in spec, field
+
+    def test_slide_specs_point_to_the_deck_json_spec(self):
+        pptx_spec = tools.start_composing()["static"]["slide_spec"]
+        html_spec = tools.start_composing(mode="html")["static"]["slide_spec"]
+        assert "deck-json-spec" in pptx_spec and "deck-json-spec" in html_spec
+        assert "speakerNotes" not in pptx_spec and '`"defaultBackground"`' not in pptx_spec
+        assert "speakerNotes" not in html_spec
+
 
 class TestInitDeckWorkspace:
     def test_html_deck_returns_format_notes(self, tmp_path: Path):

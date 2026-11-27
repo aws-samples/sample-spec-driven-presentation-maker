@@ -77,6 +77,55 @@ def test_generate_pptx_via_api_facade(mock_storage, monkeypatch):
     assert mock_storage.update_deck.called
 
 
+def test_generate_pptx_markdown_uploads_notes_beside_the_deck(mock_storage, monkeypatch):
+    """deck.json speakerNotes "markdown": the notes file written into the temp workspace is
+    uploaded next to the pptx (same build id), recorded as notesS3Key and returned."""
+    import server_utils
+    monkeypatch.setattr(server_utils, "schedule_webp_background", MagicMock())
+    mock_storage.get_deck_json.return_value = {
+        "template": "", "fonts": {"fullwidth": "", "halfwidth": ""}, "speakerNotes": "markdown",
+    }
+    mock_storage.update_deck.return_value = {"pptxS3Key": "pptx/d1/old.pptx", "notesS3Key": "pptx/d1/old.notes.md"}
+    mock_storage.presign_url.return_value = "https://signed.example/notes"
+    slide_with_notes = {**_SLIDE, "notes": "Say {{bold:hello}}."}
+    mock_storage.download_file_from_pptx_bucket.side_effect = lambda key: (
+        b"- [intro] Opening slide\n" if key.endswith("outline.md")
+        else json.dumps(slide_with_notes).encode() if key.endswith("intro.json")
+        else (_ for _ in ()).throw(FileNotFoundError(key))
+    )
+
+    result = generate_mod.generate_pptx(deck_id="d1", user_id="u1", storage=mock_storage)
+
+    uploads = {c.kwargs["key"]: c.kwargs for c in mock_storage.upload_file.call_args_list}
+    pptx_keys = [k for k in uploads if k.endswith(".pptx")]
+    notes_keys = [k for k in uploads if k.endswith(".notes.md")]
+    assert len(pptx_keys) == 1 and len(notes_keys) == 1
+    assert notes_keys[0] == pptx_keys[0][: -len(".pptx")] + ".notes.md"
+    assert uploads[notes_keys[0]]["content_type"].startswith("text/markdown")
+    assert b"Say hello." in uploads[notes_keys[0]]["data"]
+    assert mock_storage.update_deck.call_args.kwargs["updates"]["notesS3Key"] == notes_keys[0]
+    assert result["notesS3Key"] == notes_keys[0]
+    assert result["notesUrl"] == "https://signed.example/notes"
+    # Superseded pptx, notes and copy without notes are all deleted
+    deleted = {c.kwargs["Key"] for c in mock_storage._s3.delete_object.call_args_list}
+    assert deleted == {"pptx/d1/old.pptx", "pptx/d1/old.notes.md", "pptx/d1/old.nonotes.pptx"}
+
+
+def test_generate_pptx_pptx_clears_notes_key_and_deletes_old_notes(mock_storage, monkeypatch):
+    """A rebuild with "pptx" (the default) clears notesS3Key and removes the old notes object."""
+    import server_utils
+    monkeypatch.setattr(server_utils, "schedule_webp_background", MagicMock())
+    mock_storage.update_deck.return_value = {"pptxS3Key": "pptx/d1/old.pptx", "notesS3Key": "pptx/d1/old.notes.md"}
+
+    result = generate_mod.generate_pptx(deck_id="d1", user_id="u1", storage=mock_storage)
+
+    assert all(not c.kwargs["key"].endswith(".notes.md") for c in mock_storage.upload_file.call_args_list)
+    assert mock_storage.update_deck.call_args.kwargs["updates"]["notesS3Key"] is None
+    assert "notesS3Key" not in result and "notesUrl" not in result
+    deleted = {c.kwargs["Key"] for c in mock_storage._s3.delete_object.call_args_list}
+    assert deleted == {"pptx/d1/old.pptx", "pptx/d1/old.notes.md", "pptx/d1/old.nonotes.pptx"}
+
+
 def test_generate_pptx_missing_deck(mock_storage):
     mock_storage.get_deck.return_value = None
     with pytest.raises(ValueError, match="not found"):

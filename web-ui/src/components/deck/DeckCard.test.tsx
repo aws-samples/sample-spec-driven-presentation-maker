@@ -66,30 +66,61 @@ describe("DeckCard thumbnail", () => {
 })
 
 describe("DeckCard PPTX download", () => {
+  const WITH = "Download PPTX (with speaker notes): Quarterly review"
+  const WITHOUT = "Download PPTX (without speaker notes): Quarterly review"
+
   function openMenu() {
     fireEvent.keyDown(screen.getByLabelText("Deck actions"), { key: "Enter" })
-    return screen.getByRole("menuitem", { name: "Download PPTX: Quarterly review" })
+    return { withNotes: screen.getByRole("menuitem", { name: WITH }), withoutNotes: screen.getByRole("menuitem", { name: WITHOUT }) }
   }
 
-  it("downloads from the menu (keyboard) when the deck has a PPTX", () => {
+  it.each([
+    ["with notes", WITH, true],
+    ["without notes", WITHOUT, false],
+  ])("downloads %s from the menu (keyboard) when the deck has a PPTX", (_label, name, withNotes) => {
     const onDownload = vi.fn(), onOpen = vi.fn()
-    renderWithIntl(<DeckCard deck={{ ...deck, hasPptx: true }} index={0} onOpen={onOpen} onDownload={onDownload} />)
-    const item = openMenu()
-    expect(item.getAttribute("aria-disabled")).toBeNull()
-    fireEvent.click(item)
-    expect(onDownload).toHaveBeenCalledWith("d1")
+    renderWithIntl(<DeckCard deck={{ ...deck, hasPptx: true, speakerNotes: "pptx" }} index={0} onOpen={onOpen} onDownload={onDownload} />)
+    const items = openMenu()
+    expect(items.withNotes.getAttribute("aria-disabled")).toBeNull()
+    expect(items.withoutNotes.getAttribute("aria-disabled")).toBeNull()
+    expect(items.withNotes.textContent).toBe("Download PPTX (with speaker notes)")
+    expect(items.withoutNotes.textContent).toBe("Download PPTX (without speaker notes)")
+    fireEvent.click(screen.getByRole("menuitem", { name }))
+    expect(onDownload).toHaveBeenCalledWith("d1", withNotes)
     expect(onOpen).not.toHaveBeenCalled()
+  })
+
+  it("shows both items for a deck without speakerNotes (an older API, or no notes at all)", () => {
+    const onDownload = vi.fn()
+    renderWithIntl(<DeckCard deck={{ ...deck, hasPptx: true }} index={0} onOpen={() => {}} onDownload={onDownload} />)
+    const items = openMenu()
+    expect(items.withNotes.getAttribute("aria-disabled")).toBeNull()
+    expect(items.withoutNotes.getAttribute("aria-disabled")).toBeNull()
+  })
+
+  it("disables only \"with notes\" when the notes were built to Markdown", () => {
+    const onDownload = vi.fn()
+    renderWithIntl(<DeckCard deck={{ ...deck, hasPptx: true, speakerNotes: "markdown" }} index={0} onOpen={() => {}} onDownload={onDownload} />)
+    const items = openMenu()
+    expect(items.withNotes.getAttribute("aria-disabled")).toBe("true")
+    expect(items.withoutNotes.getAttribute("aria-disabled")).toBeNull()
+    fireEvent.click(items.withNotes)
+    expect(onDownload).not.toHaveBeenCalled()
+    fireEvent.click(items.withoutNotes)
+    expect(onDownload).toHaveBeenCalledWith("d1", false)
   })
 
   it.each([
     ["no PPTX built yet", { hasPptx: false }],
     ["an HTML deck or an older API (no hasPptx)", {}],
-  ])("is disabled for %s", (_label, extra) => {
+  ])("disables both for %s", (_label, extra) => {
     const onDownload = vi.fn()
     renderWithIntl(<DeckCard deck={{ ...deck, ...extra }} index={0} onOpen={() => {}} onDownload={onDownload} />)
-    const item = openMenu()
-    expect(item.getAttribute("aria-disabled")).toBe("true")
-    fireEvent.click(item)
+    const items = openMenu()
+    expect(items.withNotes.getAttribute("aria-disabled")).toBe("true")
+    expect(items.withoutNotes.getAttribute("aria-disabled")).toBe("true")
+    fireEvent.click(items.withNotes)
+    fireEvent.click(items.withoutNotes)
     expect(onDownload).not.toHaveBeenCalled()
   })
 })
