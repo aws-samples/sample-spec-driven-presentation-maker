@@ -380,6 +380,53 @@ def build_collection(sources: list[tuple[str, list[dict[str, str]]]]) -> dict[st
     return {"valid": valid, "invalid": invalid}
 
 
+#: What a listing shows about a guide. The body is deliberately absent: the listing rides
+#: inside every ``start_*`` return, so carrying 31 bodies there would duplicate the prompt.
+_LISTING_FIELDS = ("name", "description", "source", "tags", "always")
+
+
+def _selected(collection: dict[str, Any], tags: set[str]) -> list[dict[str, Any]]:
+    """Entries whose tags intersect ``tags``, by name. An empty set selects everything."""
+    return [
+        meta
+        for name, meta in sorted(collection["valid"].items())
+        if not tags or set(meta["tags"]) & tags
+    ]
+
+
+def select_guides(collection: dict[str, Any], tags: set[str]) -> list[dict[str, Any]]:
+    """What a caller carrying ``tags`` can see, in ascending name order.
+
+    A guide is selected when its tags intersect the call's tag set, so a guide tagged for
+    one composer mode only still appears in that mode's listing. An empty set — a listing
+    request with no role — selects every guide.
+    """
+    return [{key: meta[key] for key in _LISTING_FIELDS} for meta in _selected(collection, tags)]
+
+
+def always_guides(collection: dict[str, Any], tags: set[str]) -> dict[str, str]:
+    """``name -> body`` for the selected guides a caller carrying ``tags`` is handed.
+
+    The same selection as :func:`select_guides`, narrowed to the guides whose frontmatter
+    claims ``always``. That claim applies to every tag the guide carries; there is no
+    per-tag variant. Ascending name order, so the map and its joined form agree.
+    """
+    return {
+        meta["name"]: meta["body"]
+        for meta in _selected(collection, tags)
+        if meta["always"]
+    }
+
+
+def join_guides(guides: dict[str, str]) -> str:
+    """One text carrying every handed-over guide, titled and in ascending name order.
+
+    Byte-identical for equal input: the order is the sorted names and each body is
+    normalised to one trailing newline, so a prompt built from it is reproducible.
+    """
+    return "\n".join(f"# Guide: {name}\n\n{guides[name].rstrip()}\n" for name in sorted(guides))
+
+
 def list_category(category_dir: Path) -> list[dict[str, str]]:
     """List documents in a category directory with descriptions.
 
