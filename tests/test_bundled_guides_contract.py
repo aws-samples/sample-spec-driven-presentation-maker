@@ -207,11 +207,35 @@ class TestVerify:
         assert "## What the drawing asserts" in text
         assert "## Whether the text is true" in text
 
-    def test_the_form_rules_name_what_each_element_asserts(self) -> None:
+    def test_the_form_rules_name_what_each_element_encodes(self) -> None:
         text = body("verify")
         for element in ("arrow", "axis", "Colour", "icon"):
             assert element in text
         assert "asserts" in text
+
+    def test_every_form_rule_is_conditional_on_encoding_something(self) -> None:
+        # The line this guide must not cross: a slide that encodes nothing with its shapes
+        # breaks none of these, and how decorated a deck is belongs to the style.
+        section = body("verify").split("## What the drawing asserts")[1].split("\n## ")[0]
+        assert "only when the slide is using that element to encode" in section
+        assert "the shape is free" in section
+
+    def test_it_states_that_it_is_deliberately_short(self) -> None:
+        opening = body("verify").split("##")[0]
+        assert "short list on purpose" in opening
+        assert "design-rules" in opening and "visual-forms" in opening
+
+    def test_it_carries_no_rule_about_density_or_decoration(self) -> None:
+        # Those are preferences; a style that wants more decoration is not wrong.
+        text = body("verify")
+        for preference in ("asserts nothing is noise", "worth adding", "Remove it."):
+            assert preference not in text
+
+    def test_the_claim_rule_does_not_assume_the_style_puts_it_in_the_headline(self) -> None:
+        # writing-ja: a style may make the headline a topic and a lead line the claim.
+        text = body("verify")
+        assert "Whatever carries the slide's claim" in text
+        assert "the style decides which" in text
 
     def test_the_text_rules_cover_numbers_quotes_and_gaps(self) -> None:
         text = body("verify")
