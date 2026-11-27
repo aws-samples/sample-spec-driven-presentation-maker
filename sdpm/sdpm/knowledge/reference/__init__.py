@@ -17,6 +17,9 @@ from sdpm.knowledge.reference.providers import FileProvider, ReferenceProvider  
 # Package-bundled styles directory (for user-local style search fallback).
 BUNDLED_STYLES_DIR = REFERENCES_DIR / "examples" / "styles"
 
+# Package-bundled guides directory: the guide collection's last source.
+BUNDLED_GUIDES_DIR = REFERENCES_DIR / "guides"
+
 _HTML_TITLE_RE = re.compile(r"<title>(.*?)</title>", re.IGNORECASE)
 
 
@@ -187,6 +190,161 @@ def _strip_frontmatter(text: str) -> str:
             if line.strip() == "---":
                 return "".join(lines[i + 1:]).lstrip("\n")
     return text
+
+
+# ---------------------------------------------------------------------------
+# Guides: one collection, classified by role tags
+# ---------------------------------------------------------------------------
+
+#: Every role tag a guide may carry, and the whole vocabulary. Closed on purpose: a tag
+#: outside it is reported as invalid metadata instead of silently matching nothing.
+TAGS = (
+    "orchestrator",
+    "composer",
+    "composer-pptx",
+    "composer-html",
+    "style",
+    "translate",
+    "management",
+)
+
+#: Cap on one guide's text. A guide's body lands in a system prompt, so an unbounded
+#: guide inflates every prompt on that surface. Well above every bundled guide.
+GUIDE_MAX_BYTES = 64 * 1024
+
+_GUIDE_KEYS = ("description", "tags", "always")
+_FM_KEY_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_-]*):(.*)$")
+
+
+def is_guide_name(name: Any) -> bool:
+    """Whether ``name`` names one guide.
+
+    Stricter than :func:`is_style_name`, which deliberately admits ``acme.v2``: a guide
+    name is also a key in ``start_*``'s ``guides`` map, so it carries no ``.`` at all.
+    Pure — a bad name is rejected before it ever becomes a path or an S3 key.
+    """
+    return (
+        isinstance(name, str)
+        and name != ""
+        and "." not in name
+        and "\x00" not in name
+        and PureWindowsPath(name).name == name  # Windows rules also catch "/" and "C:"
+    )
+
+
+def _parse_frontmatter(text: str) -> tuple[dict[str, Any], str] | str:
+    """Split a guide into its frontmatter entries and its body, or name the failure.
+
+    Returns ``({key: value}, body)``, where a block sequence arrives as ``list[str]``
+    and everything else as the raw scalar, so the per-key checks stay in one place.
+    Returns the string ``"frontmatter"`` when the block itself is outside the grammar:
+    missing, unterminated, commented, indented, duplicated, or carrying a null value.
+
+    A blank line inside the block is allowed and carries nothing; it is the one form
+    the grammar neither spells out nor excludes, and rejecting it would only produce a
+    confusing diagnostic for a harmless authoring habit.
+    """
+    lines = text.splitlines()
+    if not lines or lines[0].strip() != "---":
+        return "frontmatter"
+    close = next((i for i, line in enumerate(lines[1:], 1) if line.strip() == "---"), None)
+    if close is None:
+        return "frontmatter"
+
+    entries: dict[str, Any] = {}
+    sequence: list[str] | None = None
+    for raw in lines[1:close]:
+        if not raw.strip():
+            continue
+        if raw.lstrip().startswith("- "):
+            if sequence is None:
+                return "frontmatter"
+            sequence.append(raw.lstrip()[2:].strip().strip('"'))
+            continue
+        if raw != raw.lstrip():
+            return "frontmatter"  # indented and not a sequence item: nested map or folded scalar
+        match = _FM_KEY_RE.match(raw)
+        if match is None:
+            return "frontmatter"  # a comment, a bare word, anything that is not `key: value`
+        key, value = match.group(1), match.group(2).strip()
+        if key in entries:
+            return "frontmatter"  # duplicate key
+        if value:
+            sequence = None
+            entries[key] = value
+        elif key == "tags":
+            sequence = []
+            entries[key] = sequence
+        else:
+            return "frontmatter"  # a null value
+    return entries, _strip_frontmatter(text)
+
+
+def _parse_tags(raw: Any) -> list[str] | None:
+    """Tag values from a flow or block sequence, or ``None`` when the value is neither."""
+    if isinstance(raw, list):
+        return raw
+    if raw.startswith("[") and raw.endswith("]"):
+        inner = raw[1:-1].strip()
+        return [item.strip().strip('"') for item in inner.split(",")] if inner else []
+    return None
+
+
+def guide_meta(name: str, text: str) -> dict[str, Any]:
+    """One guide's metadata, or the category under which it is invalid.
+
+    Returns ``{"name", "description", "tags", "always", "body"}`` for a valid guide, and
+    ``{"name", "category"}`` for an invalid one, naming the first failed check in this
+    order: ``name``, ``frontmatter``, ``unknown-key``, ``description``, ``tags``,
+    ``tag-value``, ``always``, ``size``. A guide breaking several is reported once, so a
+    caller gets one actionable cause rather than a list.
+
+    ``body`` is the frontmatter-stripped text, so this one parse serves both the listing
+    and the automatic hand-over and the two cannot disagree about what the text is.
+
+    Takes the text, not a path: the remote passes an S3 body and the local a file read.
+    """
+    def invalid(category: str) -> dict[str, Any]:
+        return {"name": name, "category": category}
+
+    if not is_guide_name(name):
+        return invalid("name")
+
+    parsed = _parse_frontmatter(text)
+    if isinstance(parsed, str):
+        return invalid(parsed)
+    entries, body = parsed
+
+    if any(key not in _GUIDE_KEYS for key in entries):
+        return invalid("unknown-key")
+
+    description = entries.get("description")
+    if not isinstance(description, str) or not description.strip('"').strip():
+        return invalid("description")
+
+    raw_tags = entries.get("tags")
+    if raw_tags is None:
+        return invalid("tags")
+    tags = _parse_tags(raw_tags)
+    if not tags:
+        return invalid("tags")
+    if any(tag not in TAGS for tag in tags):
+        return invalid("tag-value")
+
+    always = entries.get("always", "false")
+    if always not in ("true", "false"):
+        return invalid("always")
+
+    if len(text.encode("utf-8")) > GUIDE_MAX_BYTES:
+        return invalid("size")
+
+    return {
+        "name": name,
+        "description": description.strip('"').strip(),
+        "tags": tags,
+        "always": always == "true",
+        "body": body,
+    }
 
 
 def list_category(category_dir: Path) -> list[dict[str, str]]:
