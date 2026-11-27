@@ -47,6 +47,20 @@ def get_styles_dirs() -> list[Path]:
     return _get_resource_dirs("SDPM_STYLES_DIR", "styles", BUNDLED_STYLES_DIR)
 
 
+def get_guides_dirs() -> list[Path]:
+    """Return ordered list of directories to search for guides.
+
+    Search order (first match wins):
+      1. $SDPM_GUIDES_DIR — os.pathsep-separated list (same semantics as PATH)
+      2. get_user_config_dir()/guides/ — the user's own guides
+      3. Package-bundled references/guides/ directory
+    """
+    from sdpm.config import _get_resource_dirs
+    from sdpm.knowledge.reference import BUNDLED_GUIDES_DIR
+
+    return _get_resource_dirs("SDPM_GUIDES_DIR", "guides", BUNDLED_GUIDES_DIR)
+
+
 def _list_styles_tagged(styles_dirs: list[Path]) -> list[dict]:
     """Merge styles across dirs and tag each with source ("user" | "builtin")."""
     from sdpm.config import get_user_config_dir
