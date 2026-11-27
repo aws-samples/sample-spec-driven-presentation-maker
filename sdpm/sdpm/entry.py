@@ -6,8 +6,12 @@ Each ``start_*`` function returns the role document plus what that role always
 reads at the start of its work, so a model gets its role and its inputs in one
 call instead of six to eight. The payload is split in two:
 
-- ``static`` — deck-independent (role document, slide or deck.json spec). Identical across
-  calls, so an outer agent may cache it (L4 places it in the system prompt).
+- ``static`` — deck-independent and user-independent (the role document). Identical across
+  calls and across users, so an outer agent may cache it per build (L4 places it in the
+  system prompt).
+- ``must_read`` / ``listing`` — the guides this role must read, by name, and everything it
+  can see. Outside ``static`` because a user's own guides shadow the bundled ones, so both
+  depend on who is calling. The bodies come from ``read_guides``, which takes those names.
 - ``deck`` / role-specific keys — dynamic, per invocation.
 
 Servers bind these through :mod:`sdpm.tools`; the remote server materialises
@@ -87,6 +91,17 @@ def _guide_entries(directory: Path) -> list[dict[str, str]]:
     return entries
 
 
+def bundled_guide_entries() -> list[dict[str, str]]:
+    """The guides bundled in this installation, as collection source entries.
+
+    The last source of any collection. A server whose user guides live in S3 merges its
+    own group over this one and keeps the cache semantics of :func:`_guide_entries`.
+    """
+    from sdpm.knowledge.reference import BUNDLED_GUIDES_DIR
+
+    return _guide_entries(BUNDLED_GUIDES_DIR)
+
+
 def guide_collection() -> dict[str, Any]:
     """The local guide collection: the user's guides first, the bundled ones last.
 
@@ -117,7 +132,7 @@ def preload_references() -> None:
         _guide_cache = {}
     for role in ("orchestrator", "composer", "composer-html", "style", "translate"):
         _workflow(role)
-    for guide in ("slide-json-spec", "slide-html-spec", "deck-json-spec", *_FORMAT_NOTES.values()):
+    for guide in _FORMAT_NOTES.values():
         _read_reference(_GUIDES_DIR, guide)
     from sdpm.knowledge.reference import BUNDLED_GUIDES_DIR
 
@@ -128,12 +143,42 @@ def _workflow(role: str) -> str:
     return _read_reference(_WORKFLOWS_DIR, role)
 
 
-def _slide_spec() -> str:
-    return _read_reference(_GUIDES_DIR, "slide-json-spec")
+# The tag set each entry point calls with. A guide is handed over when its own tags
+# intersect this set, so a guide tagged `composer` reaches both composer modes and one
+# tagged `composer-pptx` reaches only the slide-JSON mode. No set contains `management`:
+# those guides are about sdpm itself and are found by listing, not by starting a role.
+_ROLE_TAGS = {
+    "orchestrator": {"orchestrator"},
+    "composer-pptx": {"composer", "composer-pptx"},
+    "composer-html": {"composer", "composer-html"},
+    "style": {"style"},
+    "translate": {"translate"},
+}
 
 
-def _deck_spec() -> str:
-    return _read_reference(_GUIDES_DIR, "deck-json-spec")
+def guide_payload(collection: dict[str, Any], tags: set[str]) -> dict[str, Any]:
+    """The guide part of a successful ``start_*`` return: names, not bodies.
+
+    ``must_read`` names the selected guides claiming ``always`` — what this role has to
+    read before its first step — and ``listing`` is everything the call can see, invalid
+    entries included. The text comes from ``read_guides``, by name.
+
+    The bodies are not here because this payload is a tool result, and a client files a
+    result past 30,000 characters and shows the model only its ends. Carrying them made
+    that limit depend on the collection's contents: about 4,000 characters per guide, on a
+    payload whose deck part already takes 14,000. A name costs 15, so the entry payload
+    stops growing as the collection does.
+
+    Deliberately not under ``static``: ``agent.composition._process_cache_key`` shares any
+    pick under ``static.`` across every user, and which guides are mandatory now depends on
+    the user's own collection.
+    """
+    from sdpm.knowledge.reference import always_guides, select_guides
+
+    return {
+        "must_read": sorted(always_guides(collection, tags)),
+        "listing": {"guides": select_guides(collection, tags), "invalid": collection["invalid"]},
+    }
 
 
 # Orchestrator notes per deck format: the guide init_deck_workspace returns as
@@ -199,13 +244,14 @@ def start_presentation(
     *,
     templates: list[dict] | None = None,
     output_dir: str | None = None,
+    collection: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Orchestrator entry: role document and deck.json reference (``static``) + the
-    environment it always asks about first.
+    """Orchestrator entry: role document (``static``), the guides tagged for the role,
+    and the environment it always asks about first.
 
     The styles come from ``list_styles``, which the orchestrator calls when it picks
-    one. Keyword overrides let a server whose templates live elsewhere (S3) supply
-    its own list; the local filesystem is the default.
+    one. Keyword overrides let a server whose templates or guides live elsewhere (S3)
+    supply its own; the local filesystem is the default.
     """
     if templates is None:
         templates = _templates()
@@ -213,8 +259,11 @@ def start_presentation(
         from sdpm.api import _get_output_base_dir
 
         output_dir = str(_get_output_base_dir())
+    if collection is None:
+        collection = guide_collection()
     return {
-        "static": {"workflow": _workflow("orchestrator"), "deck_spec": _deck_spec()},
+        "static": {"workflow": _workflow("orchestrator")},
+        **guide_payload(collection, _ROLE_TAGS["orchestrator"]),
         "templates": templates,
         "output_dir": output_dir,
     }
@@ -312,9 +361,9 @@ _COMPOSER_MODES = ("pptx", "html")
 
 
 def _composer_static(mode: str) -> dict[str, str]:
-    if mode == "html":
-        return {"workflow": _workflow("composer-html"), "slide_spec": _read_reference(_GUIDES_DIR, "slide-html-spec")}
-    return {"workflow": _workflow("composer"), "slide_spec": _slide_spec()}
+    # The slide format arrives as a guide: slide-json-spec is tagged composer-pptx and
+    # slide-html-spec composer-html, both with always, so the mode's tag set picks it.
+    return {"workflow": _workflow("composer-html" if mode == "html" else "composer")}
 
 
 def _existing_slides(slides_dir: Path, present: list[str], assigned: list[str], suffix: str) -> dict[str, dict]:
@@ -339,18 +388,19 @@ def start_composing(
     template_analysis: dict | None = None,
     template_html: dict | None = None,
     mode: str = "pptx",
+    collection: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Composer entry.
 
-    Without ``deck_dir`` returns only ``static`` (role document + slide spec for
-    ``mode``). With a deck, validates the specs first; when they fail, returns
-    ``{"specs_ok": False, "errors": [...]}`` and nothing else — a composer must
-    not start from broken specs. Otherwise returns ``static`` plus ``deck``:
-    the specs (the style as ``art_direction_toc``, a table of contents of
-    specs/art-direction.html the composer reads parts of), deck.json, template
-    analysis, and the assigned slides' JSON (with read-only override-group heads
-    the assigned slides inherit from). ``static.slide_spec`` is the core of the
-    slide format; the rest is in guides it names.
+    Without ``deck_dir`` returns the role document and the mode's guides, without a
+    deck. With a deck, validates the specs first; when they fail, returns
+    ``{"specs_ok": False, "errors": [...]}`` and nothing else — no role document and
+    no guides, because a composer must not start from broken specs. Otherwise returns
+    ``static`` and the guide payload plus ``deck``: the specs (the style as
+    ``art_direction_toc``, a table of contents of specs/art-direction.html the composer
+    reads parts of), deck.json, template analysis, and the assigned slides' JSON (with
+    read-only override-group heads the assigned slides inherit from). The slide format
+    arrives among ``guides``, which also name the rest.
 
     ``mode`` is the composer mode the spawner chose: ``"pptx"`` (slide JSON) or
     ``"html"`` (slide HTML). ``static`` depends only on the mode. A mode that does
@@ -362,13 +412,17 @@ def start_composing(
     ``deck_id`` labels the payload when ``deck_dir`` is a materialised copy of a deck
     that lives elsewhere; ``template_analysis`` likewise lets such a server supply the
     analysis of a template the local filesystem cannot see (``template_html`` is the
-    html-mode counterpart, a ``template_html_view`` result).
+    html-mode counterpart, a ``template_html_view`` result), and ``collection`` the
+    guides of a user whose guides live in S3.
     """
     if mode not in _COMPOSER_MODES:
         return {"specs_ok": False, "errors": ['mode must be "pptx" or "html"'], "warnings": []}
     static = _composer_static(mode)
+    if collection is None:
+        collection = guide_collection()
+    guides = guide_payload(collection, _ROLE_TAGS[f"composer-{mode}"])
     if deck_dir is None or str(deck_dir) == "":
-        return {"static": static}
+        return {"static": static, **guides}
 
     from sdpm.api import check_specs
     from sdpm.engine.schema import deck_output_format
@@ -401,6 +455,7 @@ def start_composing(
     if mode == "html":
         return {
             "static": static,
+            **guides,
             "deck": {
                 "deck_id": deck_id or str(deck_path),
                 "deck": deck_json,
@@ -419,6 +474,7 @@ def start_composing(
 
     return {
         "static": static,
+        **guides,
         "deck": {
             "deck_id": deck_id or str(deck_path),
             "deck": deck_json,
@@ -445,10 +501,12 @@ def start_style(
     *,
     styles: list[dict] | None = None,
     base_html: str | None = None,
+    collection: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Style entry: role document, the style catalogue, and one bundled style to imitate.
+    """Style entry: role document, the guides tagged ``style``, the style catalogue, and
+    one bundled style to imitate.
 
-    Keyword overrides serve a server whose styles live elsewhere (S3).
+    Keyword overrides serve a server whose styles or guides live elsewhere (S3).
     """
     name = base or _DEFAULT_BASE_STYLE
     if styles is None:
@@ -460,8 +518,11 @@ def start_style(
         if path is None:
             raise FileNotFoundError(f"Style not found: {name}")
         base_html = path.read_text(encoding="utf-8")
+    if collection is None:
+        collection = guide_collection()
     return {
         "static": {"workflow": _workflow("style")},
+        **guide_payload(collection, _ROLE_TAGS["style"]),
         "styles": styles,
         "base": {"name": name, "html": base_html},
     }
@@ -472,8 +533,14 @@ def start_style(
 # ---------------------------------------------------------------------------
 
 
-def start_translation(deck_dir: str | Path, language: str) -> dict[str, Any]:
-    """Translate entry: role document, slide spec, and the source deck's shape."""
+def start_translation(
+    deck_dir: str | Path,
+    language: str,
+    *,
+    collection: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Translate entry: role document, the guides tagged ``translate``, and the source
+    deck's shape."""
     deck_path = Path(deck_dir)
     deck_json_path = deck_path / "deck.json"
     if not deck_json_path.is_file():
@@ -486,8 +553,11 @@ def start_translation(deck_dir: str | Path, language: str) -> dict[str, Any]:
     slides_dir = deck_path / "slides"
     present = sorted(p.stem for p in slides_dir.glob("*.json")) if slides_dir.is_dir() else []
     sibling = deck_path.with_name(f"{deck_path.name}-{language}")
+    if collection is None:
+        collection = guide_collection()
     return {
-        "static": {"workflow": _workflow("translate"), "slide_spec": _slide_spec()},
+        "static": {"workflow": _workflow("translate")},
+        **guide_payload(collection, _ROLE_TAGS["translate"]),
         "deck": {
             "deck_id": str(deck_path),
             "deck": deck_json,

@@ -111,7 +111,10 @@ class _PresentationMaker:
         self.calls.append((self.user, name, arguments))
         self.called.set()
         payload = {
-            "static": {"workflow": f"# Orchestrator (fetched for {self.user})", "deck_spec": "# deck.json fields"},
+            "static": {"workflow": f"# Orchestrator (fetched for {self.user})"},
+            "must_read": ["deck-json-spec"],
+            "guides_text": f"# Guide: deck-json-spec\n\n# deck.json fields (for {self.user})\n",
+            "listing": {"guides": [], "invalid": []},
             "templates": [{"name": f"template-of-{self.user}"}],
         }
         return {"status": "success", "content": [{"text": json.dumps(payload)}]}
@@ -210,7 +213,10 @@ def test_start_presentation_and_memory_do_not_wait_for_optional_servers(assembly
 
     agent, status = assembly["create"]("u1")
 
-    assert assembly["calls"] == [("u1", "start_presentation", {})]
+    assert assembly["calls"] == [
+        ("u1", "start_presentation", {}),
+        ("u1", "read_guides", {"names": ["deck-json-spec"]}),
+    ]
     assert built["saw_start_presentation"] is True
     assert built["thread"] != request_thread
     assert agent.kwargs["session_manager"] is memory
@@ -369,7 +375,11 @@ def test_second_turn_for_the_same_user_makes_no_start_presentation_call(assembly
     first, _ = assembly["create"]("u1")
     second, _ = assembly["create"]("u1", session="s2")
 
-    assert assembly["calls"] == [("u1", "start_presentation", {})]
+    # Two tools now: the entry tool, and read_guides for the names it called mandatory.
+    assert assembly["calls"] == [
+        ("u1", "start_presentation", {}),
+        ("u1", "read_guides", {"names": ["deck-json-spec"]}),
+    ]
     assert _text(second.system_prompt) == _text(first.system_prompt)
     assert "template-of-u1" in _text(second.system_prompt)
 
@@ -378,7 +388,10 @@ def test_environment_is_cached_per_user_and_role_documents_per_process(assembly)
     assembly["create"]("u1")
     other, _ = assembly["create"]("u2")
 
-    assert assembly["calls"] == [("u1", "start_presentation", {}), ("u2", "start_presentation", {})]
+    assert assembly["calls"] == [
+        ("u1", "start_presentation", {}), ("u1", "read_guides", {"names": ["deck-json-spec"]}),
+        ("u2", "start_presentation", {}), ("u2", "read_guides", {"names": ["deck-json-spec"]}),
+    ]
     prompt = _text(other.system_prompt)
     assert "template-of-u2" in prompt and "template-of-u1" not in prompt
     # The role document is user-independent: the process keeps the first fetch.
@@ -400,7 +413,7 @@ def test_failed_prefetch_falls_back_to_resolve_parts(assembly, monkeypatch):
 
     agent, _ = assembly["create"]("u1")
 
-    assert attempts == ["start_presentation", "start_presentation"]
+    assert attempts == ["start_presentation", "start_presentation", "read_guides"]
     assert "template-of-u1" in _text(agent.system_prompt)
 
 

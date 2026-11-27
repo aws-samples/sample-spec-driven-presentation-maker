@@ -91,22 +91,22 @@ class TestStartPresentation:
 
         r = tools.start_presentation()
         assert set(r["static"]) == {"workflow"}
-        assert "# Guide: deck-json-spec" in r["guides_text"]
+        assert "deck-json-spec" in r["must_read"]
         spec = read_docs(REFERENCES_DIR / "guides", ["deck-json-spec"])[0]["content"]
-        assert spec.strip() in r["guides_text"]
+        assert spec.strip() in tools.read_guides(r["must_read"])["guides_text"]
         for field in ("template", "fonts", "defaultTextColor", "defaultBackground", "slideSize",
                       "outputFormat", "title", "language", "speakerNotes", "autoSpacing"):
             assert f"`{field}`" in spec, field
 
-    def test_the_story_line_guide_is_handed_over_too(self):
+    def test_the_story_line_guide_is_mandatory_too(self):
         r = tools.start_presentation()
-        assert "# Guide: story-line" in r["guides_text"]
+        assert r["must_read"] == ["deck-json-spec", "story-line"]
         assert set(r["listing"]) == {"guides", "invalid"}
         assert r["listing"]["invalid"] == []
 
     def test_slide_specs_point_to_the_deck_json_spec(self):
-        pptx_spec = tools.start_composing()["guides_text"]
-        html_spec = tools.start_composing(mode="html")["guides_text"]
+        pptx_spec = tools.read_guides(tools.start_composing()["must_read"])["guides_text"]
+        html_spec = tools.read_guides(tools.start_composing(mode="html")["must_read"])["guides_text"]
         assert "deck-json-spec" in pptx_spec and "deck-json-spec" in html_spec
         assert "speakerNotes" not in pptx_spec and '`"defaultBackground"`' not in pptx_spec
         assert "speakerNotes" not in html_spec
@@ -129,12 +129,13 @@ class TestInitDeckWorkspace:
 
 
 class TestStartComposing:
-    def test_role_document_and_guides_without_deck(self):
+    def test_role_document_and_mandatory_names_without_deck(self):
         r = tools.start_composing()
-        assert set(r) == {"static", "guides_text", "listing"}
+        assert set(r) == {"static", "must_read", "listing"}
         assert set(r["static"]) == {"workflow"}
         assert "# Composer" in r["static"]["workflow"]
-        assert "deck.json" in r["guides_text"]
+        assert r["must_read"] == ["slide-json-spec", "verify"]
+        assert "deck.json" in tools.read_guides(r["must_read"])["guides_text"]
 
     @pytest.mark.parametrize("mode", ["pptx", "html"])
     def test_static_depends_only_on_mode(self, mode: str, request: pytest.FixtureRequest):
@@ -149,11 +150,8 @@ class TestStartComposing:
         assert pptx["static"] == tools.start_composing(mode="pptx")["static"]
         assert pptx["static"] != html["static"]
         assert "# Composer" in html["static"]["workflow"] and "html" in html["static"]["workflow"].lower()
-        assert "# Guide: slide-html-spec" in html["guides_text"]
-        assert "# Guide: slide-json-spec" in pptx["guides_text"]
-        assert "# Guide: slide-json-spec" not in html["guides_text"]
-        # verify is tagged composer, so both modes are handed it.
-        assert "# Guide: verify" in pptx["guides_text"] and "# Guide: verify" in html["guides_text"]
+        assert pptx["must_read"] == ["slide-json-spec", "verify"]
+        assert html["must_read"] == ["slide-html-spec", "verify"]
 
     def test_invalid_mode_is_rejected(self, deck: Path):
         for args in ((), (str(deck), ["intro"])):
@@ -320,7 +318,7 @@ class TestStartTranslation:
     def test_payload(self, deck: Path):
         r = tools.start_translation(str(deck), "en")
         assert "# Translate" in r["static"]["workflow"]
-        assert "# Guide: slide-json-spec" in r["guides_text"]
+        assert r["must_read"] == ["slide-json-spec"]
         d = r["deck"]
         assert d["slides_present"] == ["demo-1", "demo-2", "intro"]
         assert d["sibling"] == str(deck.with_name(deck.name + "-en"))
@@ -567,7 +565,7 @@ def test_every_slide_format_guide_fits_the_tool_result_budget():
         result = tools.read_guides([name])
         assert result["guides_text"], name
         assert len(json.dumps(result, ensure_ascii=False)) <= _RESULT_BUDGET, name
-    spec = tools.start_composing()["guides_text"]
+    spec = tools.read_guides(tools.start_composing()["must_read"])["guides_text"]
     assert all(name in spec for name in names[1:5])
 
 

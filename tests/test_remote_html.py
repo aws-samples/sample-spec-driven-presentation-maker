@@ -259,11 +259,11 @@ def test_start_composing_html_materializes_html_slides_and_template(server, cach
     assert any(k.startswith(TEMPLATE_CACHE_PREFIX) and k.endswith("/template.json") for k in server._storage.objects)
 
 
-def test_start_composing_without_deck_returns_the_html_role_and_its_guides(server):
+def test_start_composing_without_deck_returns_the_html_role_and_its_names(server):
     payload = json.loads(server.start_composing(mode="html"))
-    assert set(payload) == {"static", "guides_text", "listing"}
+    assert set(payload) == {"static", "must_read", "listing"}
     assert payload["static"]["workflow"].startswith("# Composer (HTML)")
-    assert "# Guide: slide-html-spec" in payload["guides_text"]
+    assert payload["must_read"] == ["slide-html-spec", "verify"]
 
 
 def test_start_composing_mode_mismatch_reports_deck_format(server):

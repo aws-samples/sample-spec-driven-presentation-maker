@@ -24,9 +24,11 @@ any prefix-group head, marked `readonly`). These are current. What is left to re
 of the style your slides use and the parts of the brief's Sources your slides need. Facts come
 from the brief and its sources.
 
-`slide_spec`, returned with this document, is the slide format and what a slide can use; the
-`slide-html-scripts` guide says how a slide script runs. `read_guides(["slide-html-spec"])`
-brings the format back if it has left your context.
+**Before your first slide, call `read_guides` with every name in `must_read`** — what
+`start_composing` said this role has to read. `slide-html-spec` is the slide format and what
+a slide can use; the `slide-html-scripts` guide says how a slide script runs.
+`read_guides(["slide-html-spec"])` brings the format back if it has left your context, and
+`list_guides("composer-html")` shows what else exists.
 
 ## Building a slide
 

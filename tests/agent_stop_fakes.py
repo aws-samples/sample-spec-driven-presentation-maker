@@ -80,11 +80,17 @@ class ScriptedModel(Model):
         yield {"messageStop": {"stopReason": "tool_use"}}
 
 
-# One payload answers every direct call compose_slides and resolve_parts make
-# (check_specs, start_presentation / start_composing static parts and deck part, generate_pptx).
+# One payload answers every direct call compose_slides and resolve_parts make: check_specs,
+# the start_* role document / must_read / listing / deck part, read_guides' joined text, and
+# generate_pptx.
 _PAYLOAD = {
     "ok": True, "errors": [], "warnings": [], "slugs": ["a", "b"],
-    "static": {"workflow": "Compose slides.", "slide_spec": "Slide spec.", "deck_spec": "Deck spec."},
+    "static": {"workflow": "Compose slides."},
+    "must_read": ["slide-json-spec"],
+    "guides_text": "# Guide: slide-json-spec\n\nSlide spec.\n",
+    "listing": {"guides": [{"name": "slide-json-spec", "description": "The format.",
+                            "source": "builtin", "tags": ["composer-pptx"], "always": True}],
+                "invalid": []},
     "styles": [], "templates": [], "deck": {"specs_ok": True}, "specs_ok": True,
 }
 

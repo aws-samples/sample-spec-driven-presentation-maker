@@ -68,12 +68,19 @@ NOT_MEASURED = (
 
 # What each role's entry tool returns that does not depend on a deck: (tool, args, picks).
 ROLES: dict[str, tuple[str, dict, tuple[str, ...]]] = {
-    "orchestrator": ("start_presentation", {}, ("static.workflow", "static.deck_spec", "templates")),
-    "composer-pptx": ("start_composing", {"mode": "pptx"}, ("static.workflow", "static.slide_spec")),
-    "composer-html": ("start_composing", {"mode": "html"}, ("static.workflow", "static.slide_spec")),
-    "style": ("start_style", {}, ("static.workflow", "styles", "base.html")),
-    "translate": ("start_translation", {"language": "ja"}, ("static.workflow", "static.slide_spec")),
+    "orchestrator": ("start_presentation", {}, ("static.workflow", "listing", "templates")),
+    "composer-pptx": ("start_composing", {"mode": "pptx"}, ("static.workflow", "listing")),
+    "composer-html": ("start_composing", {"mode": "html"}, ("static.workflow", "listing")),
+    "style": ("start_style", {}, ("static.workflow", "listing", "styles", "base.html")),
+    "translate": ("start_translation", {"language": "ja"}, ("static.workflow", "listing")),
 }
+
+
+def mandatory_id(role: str) -> str:
+    """Id of the guides a role must read, fetched from read_guides by the names its entry
+    tool returned in ``must_read``. Keyed by role rather than by those names, so the id is
+    the same whatever the collection currently holds."""
+    return payload_id("read_guides", {"for": role}, "guides_text")
 
 # MCP surfaces in order of how much they are used: (surface, server file, extra sys.path dirs).
 SERVERS: dict[str, tuple[str, tuple[str, ...]]] = {
@@ -139,6 +146,30 @@ def _call_entry(tool: str, args: dict, deck_dir: str) -> dict:
     return getattr(tools, tool)(**args)
 
 
+def _nested_resolved(args: dict, deck_dir: str) -> dict:
+    """``args`` with a nested Source resolved, the way agent.composition resolves it.
+
+    An agent part may call one tool with what another returned (``read_guides`` with the
+    names an entry tool called mandatory), so measuring that part means making both calls.
+    """
+    out: dict = {}
+    for key, value in args.items():
+        if type(value).__name__ != "Source":
+            out[key] = value
+            continue
+        inner = _call_entry(value.value, value.args, deck_dir)
+        out[key] = _walk(inner, value.pick) if value.pick else inner
+    return out
+
+
+def _shown_args(args: dict) -> dict:
+    """``args`` for an id: a nested Source as the tool and pick it stands for."""
+    return {
+        key: (f"<{value.value}.{value.pick}>" if type(value).__name__ == "Source" else value)
+        for key, value in args.items()
+    }
+
+
 def collect_server(root: Path, surface: str) -> dict[str, Any]:
     """Instructions and tools/list of one MCP server, read from the server object."""
     path, extra = SERVERS[surface]
@@ -186,13 +217,18 @@ def collect_payloads(root: Path) -> dict[str, Any]:
     items: dict[str, str] = {}
     with tempfile.TemporaryDirectory() as deck_dir:
         Path(deck_dir, "deck.json").write_text("{}", encoding="utf-8")
-        for tool, args, picks in ROLES.values():
+        for role, (tool, args, picks) in ROLES.items():
             result = _call_entry(tool, args, deck_dir)
             for pick in picks:
                 try:
                     items[payload_id(tool, args, pick)] = _as_text(_walk(result, pick))
                 except KeyError:
                     continue  # an older checkout (a base commit) may not return this key yet
+            # The role's prompt also holds the guides it must read; the names come from here.
+            must_read = result.get("must_read") if isinstance(result, dict) else None
+            if must_read:
+                read = _call_entry("read_guides", {"names": must_read}, deck_dir)
+                items[mandatory_id(role)] = _as_text(read["guides_text"])
     return {"items": items}
 
 
@@ -233,8 +269,8 @@ def collect_agent(root: Path) -> dict[str, Any]:
                     items[item] = composition._read_file(source.value)
                 elif source.type == "mcp":
                     args = {"mode": "pptx", **source.args} if source.value == "start_composing" else source.args
-                    item = payload_id(source.value, args, source.pick)
-                    result = _call_entry(source.value, args, deck_dir)
+                    item = payload_id(source.value, _shown_args(args), source.pick)
+                    result = _call_entry(source.value, _nested_resolved(args, deck_dir), deck_dir)
                     items[item] = composition.pick_from_text(json.dumps(result, ensure_ascii=False), source.pick)
                 else:
                     continue  # callable parts are per-turn values (none today)
@@ -373,14 +409,16 @@ def assemble(files: dict[str, str], collected: dict[str, dict]) -> tuple[dict[st
         base = [i for i in collected[surface]["items"] if "/prompt/" not in i]  # prompts are user-invoked
         bundles[f"{SURFACE_TITLES[surface]} / tools only"] = ids(base)
         for role, (tool, args, picks) in ROLES.items():
-            bundles[f"{SURFACE_TITLES[surface]} / {role}"] = ids(base + [payload_id(tool, args, p) for p in picks])
+            role_items = [payload_id(tool, args, p) for p in picks] + [mandatory_id(role)]
+            bundles[f"{SURFACE_TITLES[surface]} / {role}"] = ids(base + role_items)
     # A typical session of a role on the most used surface: its start bundle plus every guide
     # the role's own texts name. Other surfaces add the same guides to their own start bundle.
     guides = {Path(i).stem for i in items if i.startswith(f"{GUIDES_DIR}/")}
     for role, (tool, args, picks) in ROLES.items():
         start = bundles[f"{SURFACE_TITLES['local']} / {role}"]
         # The role document and the spec it comes with; catalogues and a style's HTML are data.
-        own = [items[i] for i in ids([payload_id(tool, args, p) for p in picks if p.startswith("static.")])]
+        own_ids = [payload_id(tool, args, p) for p in picks if p.startswith("static.")] + [mandatory_id(role)]
+        own = [items[i] for i in ids(own_ids)]
         extra = [f"{GUIDES_DIR}/{n}.md" for n in named_guides(own, guides)]
         bundles[f"{SURFACE_TITLES['local']} / {role} + guides it names"] = start + [g for g in extra if g not in start]
     return items, bundles
