@@ -389,6 +389,35 @@ class TestWritingJa:
         # An English deck would otherwise carry Japanese typography rules in its prompt.
         assert metas["writing-ja"]["always"] is False
 
+    def test_line_breaks_are_one_of_the_topics_the_description_lists(self, metas) -> None:
+        assert "where a line may break" in metas["writing-ja"]["description"]
+
+    def test_it_has_a_section_on_where_a_line_may_break(self) -> None:
+        assert "## 改行" in body("writing-ja")
+
+    def test_kinsoku_is_attributed_to_the_builder_not_to_the_author(self) -> None:
+        # formatting.py sets lang="ja-JP" on every CJK run, so a rule telling the author to keep
+        # 、。）」 off a line start would be work nobody needs to do.
+        section = body("writing-ja").split("## 改行")[1]
+        assert "禁則処理" in section
+        assert "組み上げる側が行う" in section
+
+    def test_a_manual_break_goes_on_a_clause_boundary(self) -> None:
+        section = body("writing-ja").split("## 改行")[1]
+        assert "文節の切れ目" in section
+        for inside in ("語の途中", "カタカナ語の途中", "数値と単位の間", "製品名の中"):
+            assert inside in section
+
+    def test_it_rules_out_a_one_or_two_character_last_line(self) -> None:
+        section = body("writing-ja").split("## 改行")[1]
+        assert "最後の行に 1〜2 字だけ残さない" in section
+
+    def test_a_manual_break_is_sent_to_be_measured(self) -> None:
+        # The break is tied to the font size and the box width it was written against.
+        section = body("writing-ja").split("## 改行")[1]
+        assert "measure_slides" in section
+        assert "文字の大きさと枠の幅" in section
+
 
 class TestHumanReviewChecklist:
     """The checklist is itself checked: a row with a missing field helps nobody."""

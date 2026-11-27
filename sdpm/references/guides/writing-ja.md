@@ -1,5 +1,5 @@
 ---
-description: "Read when the deck's language is Japanese — headlines, bullet and label wording, style, punctuation and symbol use for Japanese slides"
+description: "Read when the deck's language is Japanese — headlines, bullet and label wording, style, punctuation, symbol use and where a line may break for Japanese slides"
 tags: [orchestrator, composer]
 ---
 
@@ -41,3 +41,13 @@ tags: [orchestrator, composer]
 - 強調（太字、色、文字の大きさ）と絵文字は、スタイルの決まりに従う。
 - スピーカーノートは話す文だけで書き、Markdown の記号を使わない。
 - 同じものは、デッキの中で同じ表記で書く。日本語訳、カタカナ、英字のどれか 1 つに決める。製品名とサービス名は公式の表記で書く。
+
+## 改行
+
+- 句点や閉じ括弧を行頭に置かない処理（禁則処理）は、組み上げる側が行う。書き手が決めるのは、1 行に入れる長さと、自分で入れる改行の位置だけである。
+- 枠に入りきらない文は、改行で畳む前に短く書き直す。自動の折り返しは語の途中でも起きる。英字の語は途中で折り返されないので、長い英字の語が混ざると行末が大きく空く。
+- 自分で改行を入れるときは、文節の切れ目で切る。助詞の後ろか、修飾する語と修飾される語の間で切る。語の途中、カタカナ語の途中、数値と単位の間、製品名の中では切らない。
+- 最後の行に 1〜2 字だけ残さない。「ます」や助詞だけが次の行に落ちるときは、文を短くするか、切る位置を 1 つ前の切れ目に戻す。
+- 見出しは 1 行に収める。2 行になるときは、主語と述語が別の行に分かれない位置で切る。
+- 空の行で間を空けない。間が必要なときは、要素を分けるか行間で空ける。
+- 自分で入れた改行は、文字の大きさと枠の幅が変われば位置がずれる。改行を入れたスライドは `measure_slides` で測り、意図した位置で切れているか確かめる。
