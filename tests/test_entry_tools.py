@@ -572,3 +572,58 @@ def test_every_slide_format_guide_fits_the_tool_result_budget():
 def test_start_presentation_fits_the_tool_result_budget():
     """The orchestrator's entry comes back inline too; the styles are list_styles' part."""
     assert len(json.dumps(tools.start_presentation(), ensure_ascii=False)) <= _RESULT_BUDGET
+
+
+# ---------------------------------------------------------------------------
+# The outline opens with why that structure was chosen (REQ-8)
+# ---------------------------------------------------------------------------
+
+_RATIONALE = """# Deck
+
+## Why this structure
+
+Conclusion-first: the audience approves budgets and has the context already, so the
+recommendation leads and the evidence follows. A narrative arc was the alternative; it
+would have spent three slides before the ask.
+
+## Intro
+- [intro] Why this matters
+  - body: One paragraph of context
+  - visual: A single statement
+  - evidence: brief Sources 1
+"""
+
+
+class TestOutlineRationale:
+    def test_the_orchestrator_is_told_to_open_the_outline_with_it(self):
+        from sdpm.config import REFERENCES_DIR
+
+        text = (REFERENCES_DIR / "workflows" / "orchestrator.md").read_text(encoding="utf-8")
+        assert "Open the file with why this structure" in text
+        assert "before the first `- [slug]` line" in text
+        assert "story-line" in text
+
+    def test_it_is_told_not_to_write_it_as_a_sub_item(self):
+        from sdpm.config import REFERENCES_DIR
+
+        text = (REFERENCES_DIR / "workflows" / "orchestrator.md").read_text(encoding="utf-8")
+        # _SUB_ITEM_RE would read an indented `- key: value` line as a slide's sub-item.
+        assert "never as an indented `- key: value` line" in text
+
+    def test_such_an_outline_still_passes_check_specs(self, deck: Path):
+        (deck / "specs" / "outline.md").write_text(_RATIONALE, encoding="utf-8")
+        result = tools.check_specs(str(deck), ["intro"])
+        assert result["ok"] is True, result
+
+    def test_the_slug_list_is_unchanged_by_the_prose(self, deck: Path):
+        before = tools.check_specs(str(deck))["slugs"]
+        (deck / "specs" / "outline.md").write_text(_RATIONALE, encoding="utf-8")
+        after = tools.check_specs(str(deck))["slugs"]
+        assert after == ["intro"]
+        assert before[0] == "intro"
+
+    def test_a_composer_reads_the_outline_whole(self, deck: Path):
+        (deck / "specs" / "outline.md").write_text(_RATIONALE, encoding="utf-8")
+        payload = tools.start_composing(str(deck), ["intro"])
+        assert payload["deck"]["specs_ok"] is True
+        assert "Why this structure" in payload["deck"]["outline"]
