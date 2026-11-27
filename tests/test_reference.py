@@ -45,7 +45,6 @@ def test_reference_vocabulary_is_environment_neutral():
     references = Path(__file__).parents[1] / "sdpm" / "references"
     roots = [references / name for name in ("workflows", "guides")]
     allowed_cli = {
-        references / "guides" / "setup.md",
         references / "guides" / "arch-layout-engine.md",
         references / "guides" / "hand-edit-sync.md",  # diff runs from the checkout (CLI-only)
     }
