@@ -141,10 +141,13 @@ def test_hearing_matches_the_cloud_tool(acp_tools):
         assert "inference" not in json.dumps(schema)
 
 
-def test_read_guides_description_lists_the_catalogue(local_tools):
+def test_the_catalogue_is_list_guides_not_a_description(local_tools):
+    # A description fixed at import time could never carry a user's own guides.
     doc = local_tools["read_guides"].description
     for g in (p.stem for p in (_ROOT / "sdpm" / "references" / "guides").glob("*.md")):
-        assert g in doc, g
+        assert g not in doc, g
+    assert "list_guides" in doc
+    assert "Which guides exist" in local_tools["list_guides"].description
 
 
 def test_entry_tools_are_the_only_ones_that_start_a_request(any_server_tools):

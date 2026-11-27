@@ -18,21 +18,23 @@ class TestContractReference:
         assert not hasattr(contract, "read_workflows")
         assert not hasattr(contract, "list_workflows")
 
-    def test_guide_catalogue_rides_in_read_guides_description(self):
-        assert not hasattr(contract, "list_guides")
+    def test_the_catalogue_is_a_tool_now_not_a_description(self):
+        # A description fixed at import time could never carry a user's own guides.
         doc = contract.read_guides.__doc__
         for name in ("design-rules", "hand-edit-sync", "slide-json-spec", "grid", "attachments"):
-            assert name in doc
+            assert name not in doc
+        assert "list_guides" in doc
+        assert contract.list_guides()["guides"]
 
     def test_read_slide_spec_as_guide(self):
         result = contract.read_guides(["slide-json-spec"])
-        assert len(result["documents"]) == 1
-        assert "deck.json" in result["documents"][0]["content"]
+        assert set(result) == {"guides_text"}
+        assert result["guides_text"].startswith("# Guide: slide-json-spec")
+        assert "deck.json" in result["guides_text"]
 
     def test_read_guides(self):
         result = contract.read_guides(["hand-edit-sync"])
-        assert len(result["documents"]) == 1
-        assert result["documents"][0]["content"]
+        assert result["guides_text"].startswith("# Guide: hand-edit-sync")
 
     def test_read_examples_is_gone(self):
         # components/all and patterns were retired; styles are reached via

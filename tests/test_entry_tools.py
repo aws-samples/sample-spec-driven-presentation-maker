@@ -85,21 +85,28 @@ class TestStartPresentation:
         for html_only in ("ECharts", "D3", "deck.css", "fragment", "preview/png", "slider"):
             assert html_only not in wf, html_only
 
-    def test_static_carries_the_deck_json_spec(self):
+    def test_the_deck_json_spec_is_handed_over_as_a_guide(self):
         from sdpm.config import REFERENCES_DIR
         from sdpm.knowledge.reference import read_docs
 
         r = tools.start_presentation()
-        assert set(r["static"]) == {"workflow", "deck_spec"}
-        spec = r["static"]["deck_spec"]
-        assert spec == read_docs(REFERENCES_DIR / "guides", ["deck-json-spec"])[0]["content"]
+        assert set(r["static"]) == {"workflow"}
+        assert "# Guide: deck-json-spec" in r["guides_text"]
+        spec = read_docs(REFERENCES_DIR / "guides", ["deck-json-spec"])[0]["content"]
+        assert spec.strip() in r["guides_text"]
         for field in ("template", "fonts", "defaultTextColor", "defaultBackground", "slideSize",
                       "outputFormat", "title", "language", "speakerNotes", "autoSpacing"):
             assert f"`{field}`" in spec, field
 
+    def test_the_story_line_guide_is_handed_over_too(self):
+        r = tools.start_presentation()
+        assert "# Guide: story-line" in r["guides_text"]
+        assert set(r["listing"]) == {"guides", "invalid"}
+        assert r["listing"]["invalid"] == []
+
     def test_slide_specs_point_to_the_deck_json_spec(self):
-        pptx_spec = tools.start_composing()["static"]["slide_spec"]
-        html_spec = tools.start_composing(mode="html")["static"]["slide_spec"]
+        pptx_spec = tools.start_composing()["guides_text"]
+        html_spec = tools.start_composing(mode="html")["guides_text"]
         assert "deck-json-spec" in pptx_spec and "deck-json-spec" in html_spec
         assert "speakerNotes" not in pptx_spec and '`"defaultBackground"`' not in pptx_spec
         assert "speakerNotes" not in html_spec
@@ -122,11 +129,12 @@ class TestInitDeckWorkspace:
 
 
 class TestStartComposing:
-    def test_static_only_without_deck(self):
+    def test_role_document_and_guides_without_deck(self):
         r = tools.start_composing()
-        assert set(r) == {"static"}
+        assert set(r) == {"static", "guides_text", "listing"}
+        assert set(r["static"]) == {"workflow"}
         assert "# Composer" in r["static"]["workflow"]
-        assert "deck.json" in r["static"]["slide_spec"]
+        assert "deck.json" in r["guides_text"]
 
     @pytest.mark.parametrize("mode", ["pptx", "html"])
     def test_static_depends_only_on_mode(self, mode: str, request: pytest.FixtureRequest):
@@ -135,13 +143,17 @@ class TestStartComposing:
         assert with_deck["deck"]["specs_ok"] is True
         assert tools.start_composing(mode=mode)["static"] == with_deck["static"]
 
-    def test_static_differs_between_modes(self):
-        pptx = tools.start_composing()["static"]
-        html = tools.start_composing(mode="html")["static"]
-        assert pptx == tools.start_composing(mode="pptx")["static"]
-        assert pptx != html
-        assert "# Composer" in html["workflow"] and "html" in html["workflow"].lower()
-        assert "slide-html" in html["slide_spec"] or "data-layout" in html["slide_spec"]
+    def test_the_mode_decides_the_role_document_and_the_guides(self):
+        pptx = tools.start_composing()
+        html = tools.start_composing(mode="html")
+        assert pptx["static"] == tools.start_composing(mode="pptx")["static"]
+        assert pptx["static"] != html["static"]
+        assert "# Composer" in html["static"]["workflow"] and "html" in html["static"]["workflow"].lower()
+        assert "# Guide: slide-html-spec" in html["guides_text"]
+        assert "# Guide: slide-json-spec" in pptx["guides_text"]
+        assert "# Guide: slide-json-spec" not in html["guides_text"]
+        # verify is tagged composer, so both modes are handed it.
+        assert "# Guide: verify" in pptx["guides_text"] and "# Guide: verify" in html["guides_text"]
 
     def test_invalid_mode_is_rejected(self, deck: Path):
         for args in ((), (str(deck), ["intro"])):
@@ -308,7 +320,7 @@ class TestStartTranslation:
     def test_payload(self, deck: Path):
         r = tools.start_translation(str(deck), "en")
         assert "# Translate" in r["static"]["workflow"]
-        assert "deck.json" in r["static"]["slide_spec"]
+        assert "# Guide: slide-json-spec" in r["guides_text"]
         d = r["deck"]
         assert d["slides_present"] == ["demo-1", "demo-2", "intro"]
         assert d["sibling"] == str(deck.with_name(deck.name + "-en"))
@@ -553,9 +565,9 @@ def test_every_slide_format_guide_fits_the_tool_result_budget():
              "visual-forms", "slide-html-spec", "slide-html-scripts"]
     for name in names:
         result = tools.read_guides([name])
-        assert result["documents"][0]["content"], name
+        assert result["guides_text"], name
         assert len(json.dumps(result, ensure_ascii=False)) <= _RESULT_BUDGET, name
-    spec = tools.start_composing()["static"]["slide_spec"]
+    spec = tools.start_composing()["guides_text"]
     assert all(name in spec for name in names[1:5])
 
 

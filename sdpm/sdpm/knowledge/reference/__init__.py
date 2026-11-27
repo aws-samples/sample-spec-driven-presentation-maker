@@ -418,6 +418,43 @@ def always_guides(collection: dict[str, Any], tags: set[str]) -> dict[str, str]:
     }
 
 
+def guides_by_name(collection: dict[str, Any], names: Iterable[str]) -> dict[str, str]:
+    """``name -> body`` for each requested guide.
+
+    The only way to address a guide: a caller passes back the identifier a listing showed
+    or a ``start_*`` named as mandatory. A user's guide resolves here exactly as a bundled
+    one does, so shadowing holds for reading as well as for listing.
+
+    Raises ``FileNotFoundError`` naming what the collection does hold — the same failure
+    the bundled reader gives, with the merged names instead of one directory's.
+    """
+    valid = collection["valid"]
+    bodies: dict[str, str] = {}
+    for name in names:
+        if name not in valid:
+            available = ", ".join(sorted(valid))
+            raise FileNotFoundError(f"'{name}' is not a guide. Available: {available}")
+        bodies[name] = valid[name]["body"]
+    return bodies
+
+
+def guides_listing(collection: dict[str, Any], role: str = "") -> dict[str, Any]:
+    """The ``list_guides`` payload: what a role can see, or everything when ``role`` is "".
+
+    An unknown role is an error rather than an empty list: a typo that silently returned
+    nothing would read as "this role has no guides".
+    """
+    if role and role not in TAGS:
+        return {"error": f"role must be one of {list(TAGS)}, got '{role}'"}
+    payload: dict[str, Any] = {
+        "guides": select_guides(collection, {role} if role else set()),
+        "role": role,
+    }
+    if collection["invalid"]:
+        payload["invalid"] = collection["invalid"]
+    return payload
+
+
 def join_guides(guides: dict[str, str]) -> str:
     """One text carrying every handed-over guide, titled and in ascending name order.
 

@@ -512,6 +512,22 @@ def _materialize_deck(deck_id: str, target: Path) -> None:
         dest.write_bytes(_storage.download_file_from_pptx_bucket(key=key))
 
 
+def _guide_collection(user_id: str) -> dict:
+    """The user's guides over the ones bundled in the image, merged once per call.
+
+    Third instance of the override pattern templates and styles already use: the engine
+    reads the image, this adds the S3 side. Built here and passed in, so the listing, the
+    hand-over and read_guides all resolve the same winning entry.
+    """
+    from sdpm.entry import bundled_guide_entries
+    from sdpm.knowledge.reference import build_collection
+
+    return build_collection([
+        ("user", user_library.list_user_guides(_storage._s3, _storage.pptx_bucket, user_id)),
+        ("builtin", bundled_guide_entries()),
+    ])
+
+
 @offloaded_tool
 def start_presentation() -> str:
     """Start here for anything about slides — a new deck, editing or importing a PPTX,
@@ -524,7 +540,8 @@ def start_presentation() -> str:
 
     user_id = _get_user_id()
     templates = template_mod.list_templates(storage=_storage, user_id=user_id).get("templates", [])
-    return json.dumps(_start(templates=templates, output_dir=""), ensure_ascii=False)
+    payload = _start(templates=templates, output_dir="", collection=_guide_collection(user_id))
+    return json.dumps(payload, ensure_ascii=False)
 
 
 @offloaded_tool
@@ -550,8 +567,9 @@ def start_composing(
     from sdpm.engine.schema import read_deck_format
     from sdpm.entry import start_composing as _start
 
+    collection = _guide_collection(_get_user_id())
     if not deck_id or not deck_id.strip():
-        return json.dumps(_start(mode=mode), ensure_ascii=False)
+        return json.dumps(_start(mode=mode, collection=collection), ensure_ascii=False)
     _check_deck_access(deck_id, action="generate_pptx")
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -564,7 +582,10 @@ def start_composing(
                 is_html = False
             deck_json = json.loads((root / "deck.json").read_text(encoding="utf-8")) if is_html else {}
             template_html = _template_html(deck_id, deck_json, root) if is_html else None
-            payload = _start(root, assigned_slugs, deck_id=deck_id, template_html=template_html, mode="html")
+            payload = _start(
+                root, assigned_slugs, deck_id=deck_id, template_html=template_html, mode="html",
+                collection=collection,
+            )
             return json.dumps(payload, ensure_ascii=False)
         analysis: dict | None = None
         try:
@@ -575,7 +596,9 @@ def start_composing(
                 )
         except Exception:  # analysis is an aid, never a blocker
             analysis = None
-        payload = _start(root, assigned_slugs, deck_id=deck_id, template_analysis=analysis or {})
+        payload = _start(
+            root, assigned_slugs, deck_id=deck_id, template_analysis=analysis or {}, collection=collection,
+        )
     return json.dumps(payload, ensure_ascii=False)
 
 
@@ -600,7 +623,8 @@ def start_style(
             base_html = _storage.download_file_from_pptx_bucket(key=user_library.user_style_key(user_id, base)).decode("utf-8")
         except Exception:
             base_html = None  # fall through to the bundled lookup inside sdpm.entry
-    return json.dumps(_start(base, styles=styles, base_html=base_html), ensure_ascii=False)
+    payload = _start(base, styles=styles, base_html=base_html, collection=_guide_collection(user_id))
+    return json.dumps(payload, ensure_ascii=False)
 
 
 # --- Workflow Tools ---
@@ -954,9 +978,39 @@ def apply_style(
     )
 
 
-# --- Reference tools (bound from the shared contract; bundled data baked into the image) ---
+# --- Reference tools ---
+# The guide tools take the caller's own collection (their S3 guides over the image's), so
+# they are bound here rather than from the shared contract, which reads the filesystem.
+# Same names, same parameters, same return shapes as the local surface.
 
-offloaded_tool(contract.read_guides)
+
+@offloaded_tool
+def list_guides(
+    role: Annotated[str, Field(description='Role tag to filter by: orchestrator, composer, composer-pptx, composer-html, style, translate, management. Empty lists every guide.')] = "",
+) -> str:
+    """Which guides exist, what each one decides, and which ones a role must read.
+
+    Call it when you need a guide you were not given, or when asked about sdpm itself.
+    Pass a name from here to read_guides.
+    """
+    from sdpm.knowledge.reference import guides_listing
+
+    return json.dumps(guides_listing(_guide_collection(_get_user_id()), role), ensure_ascii=False)
+
+
+@offloaded_tool
+def read_guides(
+    names: Annotated[list[str], Field(description='Guide names, as list_guides or must_read gave them.')],
+) -> str:
+    """Read guides by name, returned as one text with a heading per guide.
+
+    The names come from a start_* call's must_read (the guides that role must read before
+    its first step) or from list_guides.
+    """
+    from sdpm.knowledge.reference import guides_by_name, join_guides
+
+    bodies = guides_by_name(_guide_collection(_get_user_id()), names)
+    return json.dumps({"guides_text": join_guides(bodies)}, ensure_ascii=False)
 
 # User-invoked entry points (slash commands / prompt menu): vibe, spec, style, translate
 from sdpm.tools import prompts as _prompts  # noqa: E402
