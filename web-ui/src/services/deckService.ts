@@ -621,6 +621,71 @@ export async function renameUserStyle(name: string, newName: string, idToken: st
   return res.json()
 }
 
+// ── Guide Management ──
+//
+// Guides are the third resource type with a per-user store, after styles and templates.
+// No pin functions: guides have no pins and no default.
+
+/**
+ * List every guide the signed-in user can see: their own first, then the bundled ones.
+ *
+ * @param idToken - Cognito ID token for API Gateway authorization
+ * @param role - Role tag to filter by; omit for every guide
+ */
+export async function listGuides(idToken: string, role = ""): Promise<{
+  guides?: { name: string; description: string; source: string; tags: string[]; always: boolean }[]
+  invalid?: { path: string; category: string }[]
+  error?: string
+}> {
+  const base = await getApiBaseUrl()
+  const query = role ? `?role=${encodeURIComponent(role)}` : ""
+  const res = await fetch(`${base}guides${query}`, { headers: { Authorization: `Bearer ${idToken}` } })
+  return res.json()
+}
+
+/**
+ * Create or replace one of the user's guides. The service validates the name, the
+ * frontmatter and the size, so a 400 names which of them failed.
+ *
+ * @param name - Guide name, with no dots or separators
+ * @param text - The whole guide, frontmatter included
+ * @param idToken - Cognito ID token for API Gateway authorization
+ */
+export async function saveUserGuide(name: string, text: string, idToken: string): Promise<{ saved?: string; error?: string }> {
+  const base = await getApiBaseUrl()
+  const res = await fetch(`${base}guides/user`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+    body: JSON.stringify({ name, text }),
+  })
+  return res.json()
+}
+
+/**
+ * Delete one of the user's guides.
+ *
+ * @param name - Guide name
+ * @param idToken - Cognito ID token for API Gateway authorization
+ */
+export async function deleteUserGuide(name: string, idToken: string): Promise<{ deleted?: string; error?: string }> {
+  const base = await getApiBaseUrl()
+  const res = await fetch(`${base}guides/user/${encodeURIComponent(name)}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${idToken}` },
+  })
+  return res.json()
+}
+
+export async function renameUserGuide(name: string, newName: string, idToken: string): Promise<{ renamed?: { from: string; to: string }; error?: string }> {
+  const base = await getApiBaseUrl()
+  const res = await fetch(`${base}guides/user/${encodeURIComponent(name)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+    body: JSON.stringify({ newName }),
+  })
+  return res.json()
+}
+
 // ── Template Management ──
 
 /** Template entry returned by GET /templates. */

@@ -27,6 +27,11 @@ export function getUserStylesDir(): string {
   return path.join(getUserConfigDir(), "styles")
 }
 
+/** User-local guides directory — the first source of the guide collection. */
+export function getUserGuidesDir(): string {
+  return path.join(getUserConfigDir(), "guides")
+}
+
 /**
  * `output_dir` from the user's config.json with `~` expanded (sdpm.config.get_output_dir),
  * or null when the file, the key or valid JSON is missing.
