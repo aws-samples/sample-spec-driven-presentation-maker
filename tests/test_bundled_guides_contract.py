@@ -193,6 +193,64 @@ class TestStoryLine:
         for term in ("sparkline", "anaphora", "cold-open", "small-multiples"):
             assert term in text
 
+    SECTIONS = [
+        "## Who you are writing for",
+        "## Pick one backbone",
+        "## How many slides",
+        "## The opening",
+        "## Check the outline against these, in this order",
+        "## What you left out",
+        "## Shape the slides inside it",
+    ]
+
+    def test_the_sections_are_in_the_order_the_work_happens(self) -> None:
+        text = body("story-line")
+        positions = [text.find(s) for s in self.SECTIONS]
+        assert -1 not in positions, [s for s, i in zip(self.SECTIONS, positions) if i == -1]
+        assert positions == sorted(positions)
+
+    def test_it_says_to_expect_less_of_the_audience_than_the_brief_implies(self) -> None:
+        section = body("story-line").split("## Who you are writing for")[1].split("\n## ")[0]
+        for gap in ("Knowledge", "Foresight", "Comprehension", "Attention", "Motivation", "Condition"):
+            assert f"**{gap}.**" in section, gap
+        assert "least attentive" in section
+
+    def test_the_slide_count_has_both_bounds(self) -> None:
+        section = body("story-line").split("## How many slides")[1].split("\n## ")[0]
+        assert "30 seconds" in section  # the floor
+        for band in ("1–1.5 min", "1–2 min", "1.5–3 min"):
+            assert band in section, band
+
+    def test_the_opening_carries_the_point_on_its_own(self) -> None:
+        section = body("story-line").split("## The opening")[1].split("\n## ")[0]
+        assert "on its own" in section
+        assert "two stages" in section
+
+    def test_the_outline_checks_are_ordered_and_say_why(self) -> None:
+        section = body("story-line").split("## Check the outline against these, in this order")[1].split("\n## ")[0]
+        assert "a failure high on the list is not fixed by" in section
+        for n, phrase in enumerate(
+            ["Does it fit the time?", "Is what the brief asked for in here?",
+             "Does each slide follow from the one before it?", "Is it concrete?",
+             "Is the difficulty right?", "Is the tension managed?"], start=1):
+            assert f"{n}. **{phrase}**" in section, phrase
+        # The consistency check carries the sequence rule it belongs to.
+        assert "the immediately preceding slide alone" in section
+        assert "sawtooth" in section
+
+    def test_the_unused_material_has_four_destinations(self) -> None:
+        section = body("story-line").split("## What you left out")[1].split("\n## ")[0]
+        assert "four things to do with it" in section
+        assert section.count("\n- **") == 4
+
+    def test_it_prescribes_no_particular_slide_to_place_or_omit(self) -> None:
+        # Deliberately left out: a rule against a table-of-contents slide or a closing
+        # "thank you" slide, and a dedicated breather slide. Which slides exist is the
+        # deck's business, not this guide's.
+        text = body("story-line")
+        for omitted in ("table of contents", "Thank you"):
+            assert omitted not in text, omitted
+
 
 class TestVerify:
     """REQ-7.9: it says why these rules outlive the style that was applied."""
