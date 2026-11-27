@@ -154,11 +154,14 @@ def test_entry_tools_are_the_only_ones_that_start_a_request(any_server_tools):
 
 
 def test_list_styles_describes_its_own_listing(any_server_tools):
-    """The orchestrator gets the styles from list_styles alone; start_presentation returns templates."""
-    doc = any_server_tools["list_styles"].description
-    assert "start_presentation" not in doc
-    assert "other_styles" in doc and "include_all" in doc
-    assert "styles" not in any_server_tools["start_presentation"].description.split("needs first:", 1)[1]
+    """The orchestrator gets the styles from list_styles alone; start_presentation returns templates.
+
+    The orchestrator role document says how the pinned listing works; the tool keeps the
+    one fact a caller needs to widen it, on the include_all argument."""
+    tool = any_server_tools["list_styles"]
+    assert "start_presentation" not in tool.description
+    assert "pinned" in tool.input_schema["properties"]["include_all"]["description"]
+    assert "style" not in any_server_tools["start_presentation"].description.replace("restyling", "")
 
 
 def test_contract_functions_are_annotated_not_docstring_args():

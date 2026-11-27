@@ -9,17 +9,9 @@ Set ``SDPM_DISABLE_INSTRUCTIONS=1`` to serve none (used to measure that).
 
 import os
 
-INSTRUCTIONS = """spec-driven-presentation-maker: AI-powered PowerPoint generation from JSON.
-
-Call the entry tool for the role first — it returns the role document and its inputs:
-- Anything about slides (new deck, edit/import a PPTX, restyle): `start_presentation()`
-- Write assigned slides for a deck: `start_composing(deck_id, assigned_slugs, mode)`
-- Create a reusable style guide: `start_style()`
-- Translate an existing deck: `start_translation(deck_id, language)`
-
-Deck files are written only through `run_python` (never with client-side file tools):
-it validates the slides, rebuilds the PPTX (or `output.html` for HTML decks) and,
-with `measure_slides`, renders previews.
+INSTRUCTIONS = """sdpm makes slide decks (PPTX or HTML). Start any slide work with \
+start_presentation; it says what to do next. Read and write deck files only through \
+run_python, never with your own file tools.
 """
 
 

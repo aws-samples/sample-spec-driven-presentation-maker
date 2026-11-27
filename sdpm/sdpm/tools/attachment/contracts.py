@@ -27,14 +27,13 @@ from sdpm.tools.attachment.source import classify_source, materialize_local_sour
 
 
 def read_attachment(
-    source: Annotated[str, Field(description='Absolute path, S3 key (cloud), or https:// URL.')],
-    offset: Annotated[int, Field(description='UTF-8 byte offset into the text to start from.')] = 0,
-    limit: Annotated[int, Field(description='Max bytes returned, 512–10240.')] = PAGING_DEFAULT_LIMIT,
+    source: Annotated[str, Field(description='Absolute path or https:// URL.')],
+    offset: Annotated[int, Field(description='Byte offset to start from.')] = 0,
+    limit: Annotated[int, Field(description='Max bytes, 512–10240.')] = PAGING_DEFAULT_LIMIT,
 ) -> dict[str, Any]:
-    """Read a user-supplied file or URL as paged, line-numbered text — PDF, DOCX, XLSX, PPTX,
-    text, CSV, HTML, JSON — or image metadata. Pure read, nothing is stored.
-    Formats and paging: read_guides(["attachments"]).
-    """
+    """Read a user's file or URL (PDF, Office, text, HTML, JSON) as paged, line-numbered
+    text, or an image's metadata. Needs no deck and stores nothing. Paging:
+    read_guides(["attachments"])."""
     # Parameter validation
     if offset < 0:
         return {"error": {"code": "INVALID_OFFSET", "message": f"offset must be >= 0, got {offset}"}}
@@ -101,15 +100,13 @@ def read_attachment(
 
 
 def import_attachment(
-    source: Annotated[str, Field(description='Absolute path, S3 key (cloud), or https:// URL.')],
+    source: Annotated[str, Field(description='Absolute path or https:// URL.')],
     deck_id: Annotated[str, Field(description='Deck directory path.')],
-    filename: Annotated[str, Field(description="Filename override; defaults to the source's name.")] = "",
+    filename: Annotated[str, Field(description="File name; the source's name when empty.")] = "",
 ) -> dict[str, Any]:
-    """Import a file or URL into the deck's attachments/ so slides can use it: images
-    (converted to PNG), PDF/DOCX/XLSX (text + images), PPTX (full deck structure), URLs.
-    Idempotent per source. On IMPORT_INCOMPLETE call again with the same arguments.
-    Bundle layout: read_guides(["attachments"]).
-    """
+    """Copy a file or URL into the deck's attachments/ for slides to use: images become PNG,
+    PDF/DOCX/XLSX give text and images, a PPTX gives its whole deck. Layout:
+    read_guides(["attachments"])."""
     deck_dir = Path(deck_id)
     if not deck_dir.is_dir():
         return {"error": {"code": "DECK_NOT_FOUND", "message": f"Deck directory not found: {deck_id}"}}

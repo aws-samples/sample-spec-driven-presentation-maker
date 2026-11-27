@@ -48,13 +48,12 @@ _RAW_ATTACHMENT_ROOT = _DECK_ROOT / ".attachments"
 
 def read_attachment(
     source: Annotated[str, Field(description="Absolute path under the attachment home, or https:// URL.")],
-    offset: Annotated[int, Field(description="UTF-8 byte offset into the text to start from.")] = 0,
-    limit: Annotated[int, Field(description="Max bytes returned, 512–10240.")] = 10240,
+    offset: Annotated[int, Field(description="Byte offset to start from.")] = 0,
+    limit: Annotated[int, Field(description="Max bytes, 512–10240.")] = 10240,
 ) -> dict:
-    """Read a user-supplied file or URL as paged, line-numbered text — PDF, DOCX, XLSX, PPTX,
-    text, CSV, HTML, JSON — or image metadata. Pure read, nothing is stored.
-    Formats and paging: read_guides(["attachments"]).
-    """
+    """Read a user's file or URL (PDF, Office, text, HTML, JSON) as paged, line-numbered
+    text, or an image's metadata. Needs no deck and stores nothing. Paging:
+    read_guides(["attachments"])."""
     if classify_source(source) == "local_path":
         try:
             validate_local_source(source, allow_any_path=False, root=_RAW_ATTACHMENT_ROOT)
@@ -66,13 +65,11 @@ def read_attachment(
 def import_attachment(
     source: Annotated[str, Field(description="Absolute path under the attachment home, or https:// URL.")],
     deck_id: Annotated[str, Field(description="Deck directory path.")],
-    filename: Annotated[str, Field(description="Filename override; defaults to the source's name.")] = "",
+    filename: Annotated[str, Field(description="File name; the source's name when empty.")] = "",
 ) -> dict:
-    """Import a file or URL into the deck's attachments/ so slides can use it: images
-    (converted to PNG), PDF/DOCX/XLSX (text + images), PPTX (full deck structure), URLs.
-    Idempotent per source. On IMPORT_INCOMPLETE call again with the same arguments.
-    Bundle layout: read_guides(["attachments"]).
-    """
+    """Copy a file or URL into the deck's attachments/ for slides to use: images become PNG,
+    PDF/DOCX/XLSX give text and images, a PPTX gives its whole deck. Layout:
+    read_guides(["attachments"])."""
     try:
         deck_path = Path(deck_id).resolve(strict=True)
         deck_path.relative_to(_DECK_ROOT)
@@ -135,13 +132,11 @@ if os.environ.get("SDPM_LOCAL_COMPOSE") == "1":
 
 
 _Q_DESC = (
-    'Question object: {"header": str (short chip label, ~6 Japanese / ~12 English chars), '
-    '"type": "single_select" | "multi_select" | "free_text", "text": str, '
-    '"options": [{"label": str (short), "description": str (one line: what choosing it '
-    'leads to, or its trade-off), "recommended": bool (optional)}] (2-4, select types), '
-    '"placeholder": str (free_text, optional)}.'
+    '{"header": chip label, ~6 CJK / ~12 Latin chars, "type": "single_select" | "multi_select" '
+    '| "free_text", "text": str, "options": 2-4 for select types, each {"label": short, '
+    '"description": one line on what it leads to, "recommended"?: bool}, "placeholder"?: str}.'
 )
-_Q = Annotated[dict | None, Field(description="Next question; same shape as q0.")]
+_Q = Annotated[dict | None, Field(description="Next question, same shape as q0.")]
 
 
 @mcp.tool()
@@ -151,11 +146,8 @@ def hearing(
     q2: _Q = None,
     q3: _Q = None,
 ) -> str:
-    """Show the user a card of up to four structured questions, one at a time; the answers
-    arrive in the user's next message. Share your hypothesis as the recommended option and
-    its description. The card adds an "Other" choice itself. For more, call again after
-    the reply.
-    """
+    """Ask the user up to four questions on one card; the answers arrive in their next
+    message. Make your hypothesis the recommended option. The card adds "Other" itself."""
     return "Questions displayed to user. Wait for their response."
 
 
