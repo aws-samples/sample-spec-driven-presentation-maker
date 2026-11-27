@@ -8,7 +8,7 @@
 
 import fs from "fs"
 import path from "path"
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 import { cleanup, fireEvent, screen } from "@testing-library/react"
 import type { ReactNode } from "react"
 import { renderWithIntl } from "@/test/renderWithIntl"
@@ -51,7 +51,6 @@ describe("ReviewRequestCard", () => {
     localStorage.clear()
     vi.clearAllMocks()
   })
-  afterEach(cleanup)
 
   it("shows the frame count, the message, the frames with slide numbers, and no status", () => {
     const { container } = withProvider(<ReviewRequestCard request={REQUEST} />)
@@ -85,7 +84,6 @@ describe("ReviewRequestCard", () => {
 
 describe("ChatMessage with a change request", () => {
   beforeEach(() => localStorage.clear())
-  afterEach(cleanup)
 
   it("restores the card from Local history", () => {
     const [msg] = parseLocalHistory([{ role: "user", content: MESSAGE, toolUses: [] } as unknown as HistoryMessage])

@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
-import { screen, waitFor, fireEvent, cleanup } from "@testing-library/react"
+import { screen, waitFor, fireEvent } from "@testing-library/react"
 import { renderWithIntl } from "@/test/renderWithIntl"
 import { TemplatePickerSection } from "./TemplatePickerSection"
 import type { TemplateEntry } from "@/services/deckService"
@@ -50,7 +50,6 @@ describe("TemplatePickerSection", () => {
   })
 
   afterEach(() => {
-    cleanup()
     vi.clearAllMocks()
   })
 

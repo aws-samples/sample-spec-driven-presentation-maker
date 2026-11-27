@@ -1,7 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
-import { screen, fireEvent, cleanup } from "@testing-library/react"
+import { describe, it, expect, vi, beforeEach } from "vitest"
+import { screen, fireEvent } from "@testing-library/react"
 import { renderWithIntl as render } from "@/test/renderWithIntl"
 import { useState } from "react"
 import { ErrorBoundary } from "./ErrorBoundary"
@@ -15,7 +15,6 @@ describe("ErrorBoundary", () => {
   beforeEach(() => {
     vi.spyOn(console, "error").mockImplementation(() => {})
   })
-  afterEach(cleanup)
 
   it("renders children when nothing throws", () => {
     render(

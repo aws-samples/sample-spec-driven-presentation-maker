@@ -1,11 +1,9 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 
-import { afterEach, describe, expect, it } from "vitest"
-import { cleanup, fireEvent, render, screen } from "@testing-library/react"
+import { describe, expect, it } from "vitest"
+import { fireEvent, render, screen } from "@testing-library/react"
 import { HtmlSlideFrame } from "./HtmlSlideFrame"
-
-afterEach(cleanup)
 
 describe("HtmlSlideFrame", () => {
   it("renders a fully sandboxed, inert iframe at the canvas size", () => {

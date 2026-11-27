@@ -8,8 +8,8 @@
  * Japanese labels; the list is read again when a turn ends.
  */
 
-import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react"
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { act, fireEvent, screen, waitFor } from "@testing-library/react"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 import { renderWithIntl } from "@/test/renderWithIntl"
 import type { LocalSessionModels } from "@/services/localService"
 
@@ -34,8 +34,6 @@ const open = () => fireEvent.keyDown(trigger(), { key: "Enter" })
 function render(props: Partial<Parameters<typeof LocalModelPicker>[0]> = {}, locale: "en" | "ja" = "en") {
   return renderWithIntl(<LocalModelPicker sessionId="S1" isNewChat={false} busy={false} {...props} />, { locale })
 }
-
-afterEach(cleanup)
 
 beforeEach(() => {
   vi.mocked(getLocalSessionModels).mockReset()

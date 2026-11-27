@@ -1,15 +1,13 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 
-import { afterEach, describe, expect, it } from "vitest"
-import { cleanup, fireEvent, screen, within } from "@testing-library/react"
+import { describe, expect, it } from "vitest"
+import { fireEvent, screen, within } from "@testing-library/react"
 import { renderWithIntl } from "@/test/renderWithIntl"
 import { ComposeCard } from "./ComposeCard"
 import { ChatMessage } from "../ChatMessage"
 import { parseComposeState } from "./parseComposeState"
 import { activityCategory } from "./activityLabel"
-
-afterEach(cleanup)
 
 const twoGroups = {
   slide_groups: [

@@ -1,7 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 import { cleanup, fireEvent, screen } from "@testing-library/react"
 import { renderWithIntl } from "@/test/renderWithIntl"
 import type { SlidePreview } from "@/services/deckService"
@@ -52,7 +52,6 @@ function renderCarousel(props: Partial<React.ComponentProps<typeof SlideCarousel
 
 describe("SlideCarousel — HTML decks", () => {
   beforeEach(() => { viewMode.current = "grid" })
-  afterEach(cleanup)
 
   it("a grid click on slide N opens the player at reveal.js index N-1", () => {
     renderCarousel()
@@ -105,7 +104,6 @@ describe("SlideCarousel — PPTX download (cloud)", () => {
     downloadDeckPptx.mockReset()
     downloadDeckPptx.mockResolvedValue(undefined)
   })
-  afterEach(cleanup)
 
   function openMenu(speakerNotes?: "pptx" | "markdown") {
     renderCarousel({ outputFormat: "pptx", htmlUrl: null, pptxUrl: "https://cdn.example/pptx/d1/b.pptx", idToken: "tok", speakerNotes })
@@ -146,7 +144,6 @@ describe("SlideCarousel — PPTX download (cloud)", () => {
 })
 
 describe("SlideCarousel — chat button", () => {
-  afterEach(cleanup)
 
   it("offers to reopen the closed chat sheet and has no button while it is open", () => {
     const onOpenChat = vi.fn()
@@ -164,7 +161,6 @@ describe("SlideCarousel — comment tool", () => {
     viewMode.current = "grid"
     localStorage.clear()
   })
-  afterEach(cleanup)
 
   function renderWithReview(enabled = true, format: "html" | "pptx" = "html") {
     const deckSlides = format === "html" ? slides : slides.map((s) => ({ ...s, previewUrl: `https://bucket.s3.amazonaws.com/d1/${s.slug}.png` }))

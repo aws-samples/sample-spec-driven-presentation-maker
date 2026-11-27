@@ -7,8 +7,8 @@
  * them back. Without drafts the plain send is unchanged.
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react"
+import { beforeEach, describe, expect, it, vi } from "vitest"
+import { act, fireEvent, screen, waitFor } from "@testing-library/react"
 import { renderWithIntl } from "@/test/renderWithIntl"
 
 const { sendMessage, createReview, streamState } = vi.hoisted(() => ({
@@ -92,7 +92,6 @@ describe("StyleChatPanel change request", () => {
     sendMessage.mockResolvedValue(true)
     Element.prototype.scrollIntoView = vi.fn()
   })
-  afterEach(() => { cleanup() })
 
   it("sends a plain message unchanged without drafts", async () => {
     const { container } = renderPanel()

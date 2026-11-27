@@ -1,13 +1,11 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 
-import { afterEach, describe, expect, it, vi } from "vitest"
-import { cleanup, fireEvent, screen } from "@testing-library/react"
+import { describe, expect, it, vi } from "vitest"
+import { fireEvent, screen } from "@testing-library/react"
 import { renderWithIntl } from "@/test/renderWithIntl"
 import { DeckCard } from "./DeckCard"
 import type { DeckSummary } from "@/services/deckService"
-
-afterEach(cleanup)
 
 const deck = { deckId: "d1", name: "Quarterly review", slideCount: 4 } as DeckSummary
 

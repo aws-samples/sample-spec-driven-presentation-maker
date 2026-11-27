@@ -1,8 +1,8 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 
-import { afterEach, describe, expect, it, vi } from "vitest"
-import { cleanup, fireEvent, screen } from "@testing-library/react"
+import { describe, expect, it, vi } from "vitest"
+import { fireEvent, screen } from "@testing-library/react"
 import { renderWithIntl } from "@/test/renderWithIntl"
 import { FORMAT_HTML_ITEM, type PickerItem } from "@/lib/slashToken"
 import { SlashTokenReflection } from "./SlashTokenReflection"
@@ -24,8 +24,6 @@ const items: PickerItem[] = [
     pinned: true,
   },
 ]
-
-afterEach(cleanup)
 
 describe("SlashTokenReflection", () => {
   it("renders nothing when text contains no slash tokens", () => {

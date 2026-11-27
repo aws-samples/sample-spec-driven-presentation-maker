@@ -7,7 +7,7 @@
  */
 
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react"
+import { fireEvent, screen, waitFor } from "@testing-library/react"
 import { toast } from "sonner"
 import { renderWithIntl } from "@/test/renderWithIntl"
 
@@ -54,7 +54,6 @@ describe("Settings (local) — agent selection", () => {
   })
 
   afterEach(() => {
-    cleanup()
     vi.clearAllMocks()
   })
 
@@ -80,7 +79,6 @@ describe("Settings (local) — agent selection", () => {
 
 describe("Settings (local) — sections", () => {
   afterEach(() => {
-    cleanup()
     vi.clearAllMocks()
   })
 

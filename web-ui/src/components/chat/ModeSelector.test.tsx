@@ -1,12 +1,10 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 
-import { afterEach, describe, expect, it, vi } from "vitest"
-import { cleanup, fireEvent, screen } from "@testing-library/react"
+import { describe, expect, it, vi } from "vitest"
+import { fireEvent, screen } from "@testing-library/react"
 import { ModeSelector } from "./ModeSelector"
 import { renderWithIntl } from "@/test/renderWithIntl"
-
-afterEach(cleanup)
 
 const chip = () => screen.getByRole("button", { name: /Working style/ })
 const open = () => fireEvent.keyDown(chip(), { key: "Enter" })

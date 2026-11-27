@@ -1,12 +1,10 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 
-import { afterEach, describe, expect, it } from "vitest"
-import { cleanup, screen } from "@testing-library/react"
+import { describe, expect, it } from "vitest"
+import { screen } from "@testing-library/react"
 import { renderWithIntl } from "@/test/renderWithIntl"
 import { ComposerNoteCard } from "./ComposerNoteCard"
-
-afterEach(cleanup)
 
 describe("ComposerNoteCard", () => {
   it("shows a composer's report with its group and slides", () => {

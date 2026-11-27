@@ -9,11 +9,9 @@
  * 3. AnimatedSlidePreview does NOT use hardcoded aspect-[16/9]
  */
 
-import { describe, it, expect, afterEach, vi } from "vitest"
-import { render, cleanup, fireEvent } from "@testing-library/react"
+import { describe, it, expect, vi } from "vitest"
+import { render, fireEvent } from "@testing-library/react"
 import { SlideThumbnail } from "./SlideThumbnail"
-
-afterEach(cleanup)
 
 describe("SlideThumbnail — aspect ratio agnostic", () => {
   it("does not use hardcoded aspect-[16/9] class", () => {

@@ -3,7 +3,7 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { forwardRef, useState } from "react"
-import { cleanup, fireEvent, screen } from "@testing-library/react"
+import { fireEvent, screen } from "@testing-library/react"
 import { renderWithIntl } from "@/test/renderWithIntl"
 import { ChatPanelShell } from "./ChatPanelShell"
 
@@ -30,7 +30,6 @@ vi.mock("@/lib/mode", () => ({ IS_LOCAL: false }))
 vi.mock("@/services/localService", () => ({ stopLocalAgent: vi.fn() }))
 
 afterEach(() => {
-  cleanup()
   instances = 0
 })
 

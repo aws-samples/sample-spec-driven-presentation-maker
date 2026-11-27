@@ -1,8 +1,8 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 
-import { afterEach, describe, expect, it } from "vitest"
-import { cleanup, fireEvent, screen } from "@testing-library/react"
+import { describe, expect, it } from "vitest"
+import { fireEvent, screen } from "@testing-library/react"
 import { renderWithIntl } from "@/test/renderWithIntl"
 import { ContinuedFromChip } from "./ContinuedFromChip"
 
@@ -13,8 +13,6 @@ const origin = {
   updatedAt: "2026-09-22T10:00:00.000Z",
   forkedAt: "2026-09-22T11:00:00.000Z",
 }
-
-afterEach(cleanup)
 
 describe("ContinuedFromChip", () => {
   it("shows the source title and exposes origin details on focus", async () => {
