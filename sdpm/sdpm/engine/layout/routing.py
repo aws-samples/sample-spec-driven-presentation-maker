@@ -9,7 +9,6 @@ from .geometry import (
     _count_backwards,
     _count_group_pierces,
     _count_node_pierces,
-    _find_first_crossing,
     _segments_intersect,
 )
 from .model import (
@@ -24,16 +23,13 @@ from .model import (
     _port_point,
 )
 from .refine import (
-    _MAX_RESOLVE_ITERATIONS,
     _W_GROUP_PIERCE_ENGINE,
     _defect_weight,
     _detour_around_pierces,
     _edge_pierces,
     _optimize_bends,
     _reselect_sides,
-    _resolve_crossing_search,
     _rewrite_fan,
-    _separate_close_bends,
 )
 
 
@@ -1121,21 +1117,3 @@ def _align_fan_bends(edges, conn_sides, connections, nodes=None, groups=None):
         if len(indices) < 2:
             continue
         _apply_fan_guarded(indices, "fan_in")
-
-
-def _spread_overlapping_bends(edges, conn_sides, connections):
-    """Iteratively resolve edge crossings and separate close bends.
-
-    Phase 1: Resolve all crossings by searching for optimal bend shifts.
-    Phase 2: Separate bends that are too close (even if not crossing).
-    """
-    # Phase 1: resolve crossings
-    for _iteration in range(_MAX_RESOLVE_ITERATIONS):
-        crossing = _find_first_crossing(edges)
-        if crossing is None:
-            break
-        i, si, j, sj = crossing
-        _resolve_crossing_search(edges, i, si, j, sj)
-
-    # Phase 2: separate close parallel bends
-    _separate_close_bends(edges)
