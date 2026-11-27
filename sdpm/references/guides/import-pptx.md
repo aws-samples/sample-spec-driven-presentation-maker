@@ -195,18 +195,8 @@ PPTX's visual identity as a style specification** — design tokens
 plus 5-6 demonstration slides that show *how the design rules apply*,
 not what the source deck contained.
 
-The output follows the same conventions as every other sdpm style:
-
-- `:root` block with all design tokens as CSS variables (the style's
-  *machine-readable specification* — composer reads `var()`
-  references, not pixel values).
-- 5-6 demonstration slides (cover, palette / type ramp / component
-  swatches / ...). Each slide demonstrates the design while
-  explaining the reasoning. This is **NOT** a re-render of the
-  source deck's content slides.
-- 1920×1080 absolute positioning, pt units, `.t-*` text classes,
-  `.el` for absolute elements. (See the `style` workflow for the
-  full rule list.)
+The output follows the same conventions as every other sdpm style
+(the `style` workflow, loaded in 5-1).
 
 The composer reads this file when the user later asks to **edit**
 slides — it consumes the tokens, not the demonstration markup.
@@ -231,17 +221,6 @@ Step 5-2.
 ```
 start_style()
 ```
-
-Key conventions you must follow (full list in the workflow):
-- All design tokens in `:root` as CSS variables.
-- All colors via `var()` references — never hardcoded in elements.
-- Text style classes (`.t-cover-title`, `.t-slide-title`, `.t-body`,
-  ...) reference CSS variables. Use class names consistently.
-- Component classes (`.card`, `.accent-bar`, `.divider`, ...) also
-  via CSS variables.
-- Inline `style="..."` only for `left / top / width / height`.
-- 5-6 demonstration slides (cover + design areas) — NOT the source
-  deck's slides.
 
 Then pull a built-in style as a structural reference:
 
@@ -416,43 +395,10 @@ lists, charts, or specific data into the demonstration slides — that
 content lives in `slides/` (placed by Step 4), not in the style
 specification.
 
-Write incrementally via `run_python` — one call for the
-skeleton + `:root` + first slide, then one or two more for the
-remaining slides (per the style workflow's incremental writing
-guidance):
-
-```python
-# Cloud: prepend purpose="Author art-direction.html — skeleton + tokens"
-header = """<!DOCTYPE html>
-<html lang="ja">
-<head>
-<meta charset="UTF-8">
-<title><source-PPTX visual system name></title>
-<style>
-  :root {
-    /* ...design tokens populated from the table above... */
-  }
-  body { margin: 0; padding: 40px; background: #E5E5E5; zoom: 0.7; }
-  .slide { position: relative; width: 1920px; height: 1080px; margin: 0 auto 40px; background: var(--color-bg); overflow: hidden; }
-  .el { position: absolute; }
-  /* .t-cover-title / .t-slide-title / .t-body / ... — each maps to
-     CSS variables defined in :root. */
-  /* Component classes (.card, .accent-bar, .divider) — only those
-     Lens A actually saw in the source. */
-</style>
-</head>
-<body>
-"""
-cover_slide = """  <div class="slide">
-    <!-- Cover demonstration: title + style name. Placeholder text only. -->
-  </div>
-"""
-write_text("specs/art-direction.html", header + cover_slide)
-```
-
-Subsequent calls append palette swatches, type ramp, and
-component-only demonstration slides — see the style workflow
-for the standard demonstration-slide set.
+Write `specs/art-direction.html` incrementally via `run_python`
+with `write_text` — one call for the skeleton + `:root` + first
+slide, then one or two more for the remaining slides (per the style
+workflow's incremental writing guidance).
 
 Quality bar before considering this Step done:
 
