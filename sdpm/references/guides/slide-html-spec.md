@@ -1,7 +1,7 @@
 ---
-name: slide-html-spec
 description: "Slide HTML format — slides/<slug>.html sections, data-ph / data-region, tokens, deck.css, notes, images, chrome; slide scripts are in slide-html-scripts"
-category: guide
+tags: [composer-html]
+always: true
 ---
 
 # Slide HTML Reference

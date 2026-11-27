@@ -1,5 +1,6 @@
 ---
 description: "Design vocabulary for intra-slide visual design — read during art direction phase"
+tags: [orchestrator]
 ---
 
 # Design Vocabulary

@@ -1,5 +1,6 @@
 ---
 description: "Review checklist for visual quality — read during preview review phase"
+tags: [orchestrator]
 ---
 
 # Design Review Guide

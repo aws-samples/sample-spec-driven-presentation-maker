@@ -1,5 +1,6 @@
 ---
 description: "Bar chart JSON structure and style overrides — read when slide contains bar/column chart"
+tags: [composer-pptx]
 ---
 
 Bar charts (vertical, horizontal, stacked) for comparison data.

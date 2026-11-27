@@ -1,7 +1,6 @@
 ---
-name: html-deck
 description: "HTML decks for the orchestrator — what a slide can do, how the brief and outline describe it, reviewing and deck.css (init_deck_workspace returns it as format_notes)"
-category: guide
+tags: [orchestrator]
 ---
 
 # HTML deck — format notes

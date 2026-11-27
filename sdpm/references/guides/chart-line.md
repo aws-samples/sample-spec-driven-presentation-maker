@@ -1,5 +1,6 @@
 ---
 description: "Line chart JSON structure and style overrides — read when slide contains line/trend chart"
+tags: [composer-pptx]
 ---
 
 Line charts for time-series and trend data.

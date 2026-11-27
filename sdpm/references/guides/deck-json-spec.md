@@ -1,7 +1,7 @@
 ---
-name: deck-json-spec
 description: "deck.json fields — template, fonts, colours, slide size, output format, document properties, speaker notes, auto-spacing: required or optional, default, who writes each, which format it affects"
-category: guide
+tags: [orchestrator]
+always: true
 ---
 
 # deck.json

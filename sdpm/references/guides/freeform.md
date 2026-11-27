@@ -1,5 +1,6 @@
 ---
 description: "Freeform path drawing — read when building custom shapes with path commands (curves, arcs, multi-segment lines)"
+tags: [composer-pptx]
 ---
 
 # Freeform Guide

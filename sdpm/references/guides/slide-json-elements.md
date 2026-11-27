@@ -1,7 +1,6 @@
 ---
-name: slide-json-elements
 description: "Slide JSON elements — fields of textbox, shape, line, image, include and group, alt text, text sizing, labeled shapes, and slide override (inheritance)"
-category: guide
+tags: [composer-pptx]
 ---
 
 # Slide JSON Elements

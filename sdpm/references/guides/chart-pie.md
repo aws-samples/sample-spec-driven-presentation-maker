@@ -1,5 +1,6 @@
 ---
 description: "Pie/donut chart JSON structure and style overrides — read when slide contains pie/donut chart"
+tags: [composer-pptx]
 ---
 
 Pie/donut charts for proportions and breakdowns.

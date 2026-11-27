@@ -1,5 +1,6 @@
 ---
 description: "Table styling guide — read when slide contains a data table"
+tags: [composer]
 ---
 
 Tables for structured data: comparisons, feature matrices, status dashboards, pricing plans.

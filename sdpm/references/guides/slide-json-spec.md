@@ -1,7 +1,7 @@
 ---
-name: slide-json-spec
 description: "Slide JSON format core — deck folder, slides/*.json, comments and regions, notes, placeholders, coordinates, styled text, and the guide holding each element's fields"
-category: guide
+tags: [composer-pptx, translate]
+always: true
 ---
 
 # JSON Schema Reference

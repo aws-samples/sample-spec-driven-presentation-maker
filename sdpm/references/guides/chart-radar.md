@@ -1,5 +1,6 @@
 ---
 description: "Radar chart JSON structure and style overrides — read when slide contains radar/spider chart"
+tags: [composer-pptx]
 ---
 
 Radar (spider) charts for comparing a few options across several criteria.

@@ -1,5 +1,6 @@
 ---
-description: "Japanese writing for slides (headlines, bullets, labels, speaker notes) — read when the deck is in Japanese"
+description: "Read when the deck's language is Japanese — headlines, bullet and label wording, style, punctuation and symbol use for Japanese slides"
+tags: [orchestrator, composer]
 ---
 
 # 日本語のスライドの書き方

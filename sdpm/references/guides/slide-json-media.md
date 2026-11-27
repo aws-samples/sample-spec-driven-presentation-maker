@@ -1,7 +1,6 @@
 ---
-name: slide-json-media
 description: "Slide JSON media — image masks, crops and colour treatments, QR codes, code blocks, charts, freeform paths and video"
-category: guide
+tags: [composer-pptx]
 ---
 
 # Slide JSON Media

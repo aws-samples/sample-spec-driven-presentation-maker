@@ -1,7 +1,6 @@
 ---
-name: grid
 description: "Coordinate calculation via CSS Grid — read before placing elements"
-category: guide
+tags: [composer, style]
 ---
 
 # Grid Contract

@@ -1,7 +1,6 @@
 ---
-name: visual-forms
 description: "Visual forms — when to draw a form instead of text, icon use and sizing, and the geometry of flow, cycle, hub, hierarchy, matrix, timeline, progress and other forms in slide JSON"
-category: guide
+tags: [composer, style]
 ---
 
 # Visual forms
