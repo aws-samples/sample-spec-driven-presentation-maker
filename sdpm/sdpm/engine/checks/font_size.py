@@ -1,7 +1,8 @@
 """Font size token discipline check.
 
-Verifies that every `fontSize` in a slide JSON corresponds to a `--fs-*`
-token defined in the project's active style (specs/art-direction.html).
+Verifies that every `fontSize` in a slide JSON, including sizes set inline
+in text (``{{22pt:text}}``), corresponds to a `--fs-*` token defined in the
+project's active style (specs/art-direction.html).
 
 Per the Token Discipline rule in the composer workflow:
 > Every fontSize in presentation.json must come from a token defined in
@@ -17,14 +18,10 @@ import re
 from pathlib import Path
 from typing import Iterable
 
+from sdpm.utils.text import parse_styled_text
+
 # Captures `--fs-name: 24pt;` style declarations under :root.
 _FS_TOKEN_RE = re.compile(r"--fs-[\w-]+\s*:\s*(\d+)pt\s*;")
-
-# Inline styled-text directives: {{attrs:text}} (same pattern as
-# sdpm.utils.text._parse_non_link_styles). Also matches the
-# {{NNpt,link:URL:text}} form, whose attrs include `NNpt`.
-_INLINE_TAG_RE = re.compile(r"\{\{([^:}]+):((?:\\}|[^}])+)\}\}")
-_INLINE_PT_RE = re.compile(r"^(\d+)pt$")
 
 
 def parse_allowed_font_sizes(art_direction_path: Path) -> set[int]:
@@ -42,11 +39,8 @@ def parse_allowed_font_sizes(art_direction_path: Path) -> set[int]:
 def _walk_font_sizes(node) -> Iterable[tuple[list[str], int]]:
     """Yield (path, fontSize) tuples found anywhere in a JSON-like structure.
 
-    `path` is a list of keys/indices for diagnostic display.
-
-    Known limitation: does not detect fontSize specified via inline
-    directives inside text strings (e.g. ``{{14pt:small text}}``).
-    Those are parsed at render time by ``sdpm.utils.text.parse_styled_text``.
+    `path` is a list of keys/indices for diagnostic display. Sizes set
+    inline inside text strings are found by ``_walk_inline_font_sizes``.
     """
     if isinstance(node, dict):
         if "fontSize" in node and isinstance(node["fontSize"], (int, float)):
@@ -61,12 +55,16 @@ def _walk_font_sizes(node) -> Iterable[tuple[list[str], int]]:
 
 
 def _inline_font_sizes(text: str) -> Iterable[int]:
-    """Yield pt sizes from inline ``{{NNpt:...}}`` directives in a string."""
-    for m in _INLINE_TAG_RE.finditer(text):
-        for attr in m.group(1).split(","):
-            attr = attr.strip()
-            if _INLINE_PT_RE.match(attr):
-                yield int(attr[:-2])
+    """Yield pt sizes set inline in a string (``{{22pt:x}}``, nested or link forms).
+
+    Parsed by the renderer's own ``parse_styled_text`` so the check sees exactly
+    the sizes the builder applies.
+    """
+    if "{{" not in text:
+        return
+    for seg in parse_styled_text(text, auto_spacing=False):
+        if "fontSize" in seg:
+            yield seg["fontSize"]
 
 
 def _walk_inline_font_sizes(node) -> Iterable[tuple[list[str], int]]:
@@ -129,18 +127,11 @@ def check_font_size_tokens(
     for slide_idx, slide in enumerate(slides, start=1):
         slug = slide.get("id", "")
         base = f"page{slide_idx:02d}({slug})" if slug else f"page{slide_idx:02d}"
-        for path, fs in _walk_font_sizes(slide):
+        found = [(path, fs, "") for path, fs in _walk_font_sizes(slide)]
+        found += [(path, fs, ":inline") for path, fs in _walk_inline_font_sizes(slide)]
+        for path, fs, suffix in found:
             if fs not in allowed:
-                location = base
-                if path:
-                    location += " " + ".".join(path)
-                violations.setdefault(fs, []).append(location)
-        for path, fs in _walk_inline_font_sizes(slide):
-            if fs not in allowed:
-                location = base
-                if path:
-                    location += " " + ".".join(path)
-                location += ":inline"
+                location = base + (" " + ".".join(path) if path else "") + suffix
                 violations.setdefault(fs, []).append(location)
 
     if not violations:

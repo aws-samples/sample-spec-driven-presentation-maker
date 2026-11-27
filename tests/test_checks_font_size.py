@@ -296,6 +296,19 @@ class TestInlineDirectives:
         joined = "\n".join(self._run(tmp_path, "{{20pt,link:https://e.com:x}}"))
         assert "20pt" in joined and ":inline" in joined
 
+    def test_nested_directive(self, tmp_path):
+        # The builder flattens {{bold:{{22pt:X}}}} to {{bold,22pt:X}} (#123).
+        joined = "\n".join(self._run(tmp_path, "{{bold:{{22pt:X}}}}"))
+        assert "22pt" in joined and ":inline" in joined
+
+    def test_nested_directive_mid_text(self, tmp_path):
+        joined = "\n".join(self._run(tmp_path, "{{bold:a{{22pt:b}}c}}"))
+        assert "22pt" in joined and ":inline" in joined
+
+    def test_escaped_brace(self, tmp_path):
+        joined = "\n".join(self._run(tmp_path, "{{22pt:a\\}b}}"))
+        assert "22pt" in joined and ":inline" in joined
+
     def test_nested_group_child(self, tmp_path):
         joined = "\n".join(self._run(tmp_path, "{{22pt:x}}", nested=True))
         assert "22pt" in joined
