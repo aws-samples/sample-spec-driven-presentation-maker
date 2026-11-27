@@ -86,9 +86,21 @@ else does not: a guide for tables, a guide for a chart type, a guide for importi
 those are read when the work calls for them, and their description is what makes them
 findable.
 
-Keep a role to a handful — roughly two to five. Past that the prompt is mostly guides, the
+Keep a role to a handful, roughly two to five. Past that the prompt is mostly guides, the
 role document competes with them for attention, and the guide that actually mattered on this
 deck is buried among the ones that did not.
+
+**Look at what the role already carries before you add to it.** `list_guides("composer")`
+marks which guides are handed over automatically. If one of them already holds the ground
+yours would cover, take its name rather than putting a second name beside it: a guide of
+yours called `verify` replaces the bundled `verify` for you, and the role still receives
+exactly one. Add a second only when the two are read for different reasons.
+
+Nothing checks this for you. Two guides with different names and `always: true` on the same
+tag both load, and what the role must read is the sum of them. The sum has to stay small
+enough to be read: the mandatory text of a role is fetched in one call, and a client stops
+showing a result in full past about 30,000 characters. The bundled sets run from about 8,000
+to 12,500, so there is room for one guide of your own, not for five.
 
 ## Naming a guide, and its one line
 
@@ -108,6 +120,42 @@ the guide. Write what the guide decides and when it applies. Two failure modes:
 
 Instead, name the decision: "Which table shape fits the data, and the row and column limits
 beyond which a table should become a chart."
+
+## Bringing in a document you already have
+
+A house style, a review checklist, a wiki page, a skill you wrote for another agent: one
+document, written for a human or for a different tool, that you now want sdpm to follow. It
+almost never becomes one guide, because it was organised by subject and a guide is organised
+by the moment it is read.
+
+Read it once and mark each part with **who would read it and when**. Those marks are the
+split, and they are the same test as further up: the orchestrator's parts and the composer's
+parts separate; the parts that apply to every deck separate from the parts that apply only
+under a condition. A document with four such marks is four guides, even if its author saw
+one subject.
+
+Then, for each piece:
+
+1. Name it after what it decides, not after the section it came from.
+2. Give it the tags of the roles that marked it — every tag it could be called under.
+3. Write its description with the condition first, when it has one.
+4. Set `always` only where the test above holds, and check the role's existing mandatory set
+   before you do.
+5. Register it, then read `list_guides` again. Doing them one at a time is what lets you see
+   whether a piece landed where you meant it to.
+
+Three things not to carry over:
+
+- **Instructions about the other tool.** Commands, file layouts, the other agent's own rules.
+  The reader here has sdpm's tools and nothing else.
+- **Parts that restate what sdpm already does.** Read the guides the role is already handed
+  first. A paragraph that repeats the slide format costs the same as one that adds something
+  and contradicts it the moment the format changes.
+- **The document's own preamble.** Its purpose, its history, who approved it. A guide opens
+  with the decision it settles.
+
+If a piece turns out to be two sentences, it is not a guide. Put those sentences in the
+description of the guide they qualify, or in your deck's brief.
 
 ## Saying when to read it
 

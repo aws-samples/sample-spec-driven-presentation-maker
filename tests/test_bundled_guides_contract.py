@@ -228,6 +228,7 @@ class TestWritingAGuide:
         "## Which tags to set",
         "## When always is justified",
         "## Naming a guide, and its one line",
+        "## Bringing in a document you already have",
         "## Saying when to read it",
     ]
 
@@ -248,6 +249,20 @@ class TestWritingAGuide:
     def test_it_says_roughly_how_many_always_guides_a_role_should_carry(self) -> None:
         section = body("writing-a-guide").split("## When always is justified")[1].split("\n## ")[0]
         assert "two to five" in section
+
+    def test_it_sends_the_author_to_the_roles_existing_mandatory_set(self) -> None:
+        # Nothing in code compares two always guides, so the author has to look.
+        section = body("writing-a-guide").split("## When always is justified")[1].split("\n## ")[0]
+        assert "list_guides(" in section
+        assert "Nothing checks this for you" in section
+        assert "30,000" in section  # the limit the sum has to stay under
+
+    def test_it_says_how_to_turn_an_existing_document_into_guides(self) -> None:
+        section = body("writing-a-guide").split("## Bringing in a document you already have")[1].split("\n## ")[0]
+        assert "who would read it and when" in section  # the split test
+        assert "every tag it could be called under" in section
+        for dropped in ("Instructions about the other tool", "restate what sdpm already does", "own preamble"):
+            assert dropped in section
 
     def test_the_japanese_deck_case_is_worked_through(self) -> None:
         section = body("writing-a-guide").split("## Saying when to read it")[1]
