@@ -52,18 +52,76 @@ def _read_reference(directory: Path, name: str) -> str:
     return content
 
 
+# The bundled guides' raw text, keyed by directory. Separate from _reference_cache
+# because that one holds frontmatter-stripped content: a guide's metadata has to survive
+# the read. Same None-means-uncached rule, flipped by the same preload_references().
+_guide_cache: dict[Path, list[dict[str, str]]] | None = None
+
+
+def _guide_entries(directory: Path) -> list[dict[str, str]]:
+    """Every guide in one directory, raw, as collection source entries.
+
+    Raw rather than frontmatter-stripped: the one parse in ``guide_meta`` needs the
+    metadata and produces the stripped body itself, so stripping here would mean parsing
+    the file twice and risking two answers about what the text is.
+
+    A directory that does not exist yields nothing, so a user with no guides of their own
+    costs no error. Only the bundled directory is ever cached: a user's guides live in a
+    store that changes under a running process.
+    """
+    from sdpm.knowledge.reference import BUNDLED_GUIDES_DIR
+
+    cache = _guide_cache
+    if cache is not None and directory in cache:
+        return cache[directory]
+    entries = (
+        [
+            {"name": path.stem, "location": str(path), "text": path.read_text(encoding="utf-8")}
+            for path in sorted(directory.glob("*.md"))
+        ]
+        if directory.is_dir()
+        else []
+    )
+    if cache is not None and directory == BUNDLED_GUIDES_DIR:
+        cache[directory] = entries
+    return entries
+
+
+def guide_collection() -> dict[str, Any]:
+    """The local guide collection: the user's guides first, the bundled ones last.
+
+    Built per call, so a guide added or edited in a checkout or in the user's directory
+    takes effect on the next call. The remote builds the same object from S3 bodies and
+    passes it in instead.
+    """
+    from sdpm.api import get_guides_dirs
+    from sdpm.knowledge.reference import BUNDLED_GUIDES_DIR, build_collection
+
+    return build_collection(
+        [
+            ("builtin" if directory == BUNDLED_GUIDES_DIR else "user", _guide_entries(directory))
+            for directory in get_guides_dirs()
+        ]
+    )
+
+
 def preload_references() -> None:
     """Read every role document and spec the entry payloads use, and serve them from memory from now on.
 
     For a server whose bundled references cannot change for the life of its process.
     """
-    global _reference_cache
+    global _reference_cache, _guide_cache
     if _reference_cache is None:
         _reference_cache = {}
+    if _guide_cache is None:
+        _guide_cache = {}
     for role in ("orchestrator", "composer", "composer-html", "style", "translate"):
         _workflow(role)
     for guide in ("slide-json-spec", "slide-html-spec", "deck-json-spec", *_FORMAT_NOTES.values()):
         _read_reference(_GUIDES_DIR, guide)
+    from sdpm.knowledge.reference import BUNDLED_GUIDES_DIR
+
+    _guide_entries(BUNDLED_GUIDES_DIR)
 
 
 def _workflow(role: str) -> str:
