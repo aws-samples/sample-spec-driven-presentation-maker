@@ -15,6 +15,24 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ### Added
 
+- **Guides are one collection, classified by role tags, and you can add your own.** Every
+  guide — the 31 bundled ones and any you write — carries `description`, `tags` and an
+  optional `always` in its frontmatter, and they all resolve from one merged list: your own
+  guides first, then the bundled ones, so a guide of yours named `design-rules` replaces the
+  bundled one for you and for nobody else. Locally that is `guides/` under your sdpm config
+  directory, or `$SDPM_GUIDES_DIR`; on the AWS stack it is `user-guides/{user}/` with four
+  endpoints (`GET /guides`, `POST /guides/user`, `DELETE` and `PATCH /guides/user/<name>`)
+  and the Web UI wiring, the same shape styles and templates already have, minus the pin.
+  New `list_guides(role)` tool answers which guides exist, what each decides and which ones a
+  role must read — before this, the only enumeration anywhere was an error message. The tag
+  vocabulary is closed (`orchestrator`, `composer`, `composer-pptx`, `composer-html`, `style`,
+  `translate`, `management`), and a guide with `always: true` is named in its roles'
+  `must_read`, so one of your own guides can be mandatory. An invalid guide is reported in the
+  listing with the reason, never silently dropped; a write is refused with the reason named.
+  New `verify` guide (the rules a slide owes whatever its style says, mandatory for both
+  composer modes) and `writing-a-guide` (how to write one). `specs/outline.md` now opens with
+  why that structure was chosen. Local mode and the AWS stack.
+
 - **Speaker notes destination** (`deck.json` `"speakerNotes"`, #666). `"pptx"` (the
   default, unchanged behaviour) writes each slide's `notes` as speaker notes; `"markdown"`
   leaves them out of the .pptx and writes them to `<output stem>.notes.md` beside it (one
@@ -38,8 +56,8 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   and the deck detail carry `speakerNotes` (`"pptx"` | `"markdown"`) for the stored .pptx.
 - **`deck-json-spec` guide.** Every `deck.json` field of PPTX and HTML decks in one list:
   required or optional, default, who writes it and which format it affects.
-  `start_presentation` returns it as `static.deck_spec`, and the AWS stack's agent puts it in
-  the orchestrator's system prompt; `slide-json-spec` and `slide-html-spec` point to it.
+  `start_presentation` names it in `must_read`, and the AWS stack's agent puts it in the
+  orchestrator's system prompt; `slide-json-spec` and `slide-html-spec` point to it.
 - **Area charts** (`chartType: "area"`, #620). An area chart takes the same categories and
   series as a bar chart; `stacked: true` stacks the areas, and series `color`, `valueAxis`,
   `categoryAxis`, `style`, `legend` and `dataLabels` work as for `bar`. `pptx_to_json`
@@ -54,6 +72,29 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   (AGENTS.md, steering) get a table of their own, and the report lists what it does not
   measure. CI writes the table, with +/- against the base commit, to the `python` job
   summary. Report only; nothing fails on size. Development only.
+
+### Changed
+
+- **Breaking: `start_*` no longer returns `static.slide_spec` or `static.deck_spec`.** A
+  successful `start_presentation`, `start_composing`, `start_style` or `start_translation`
+  returns `must_read` — the names of the guides that role has to read — and `listing`, and
+  `static` keeps only `workflow`. Callers that read the two removed keys call
+  `read_guides(must_read)` instead. The payload is a tool result, and a client files a result
+  past 30,000 characters and shows the model only its ends; carrying the guide text made that
+  limit depend on how many guides the collection held (about 4,000 characters each), which put
+  a composer with three slides at 30,750. It is about 11,800 now. Error returns are unchanged.
+- **Breaking: `read_guides` returns `{"guides_text": str}`** instead of
+  `{"documents": [{"name", "content"}]}` — one text, each guide under a `# Guide: <name>`
+  heading, in ascending name order. One representation rather than a list that carries every
+  body a second time, and a single string is what a system prompt can hold. Its `names`
+  parameter is unchanged, and page specifiers (`name/3`) are gone with `documents`: they were
+  a .pptx affordance and every guide is markdown.
+- **Breaking: the guide `storytelling-vocabulary` is now `story-line`.** Callers that named it
+  use `story-line`. The five backbone families a deck's slide sequence can take, each with the
+  audience condition that chooses it, moved from the middle of the document to its opening,
+  and the vocabulary sits behind them; the orchestrator is handed it on every deck. The guide
+  `writing-ja` keeps its name. The guide `setup` is deleted: nothing referenced it and it told
+  the reader to enter a directory this repository does not contain.
 
 ### Fixed
 
