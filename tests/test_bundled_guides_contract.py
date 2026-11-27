@@ -360,7 +360,7 @@ class TestSourceMaterialGuide:
 
     def test_the_retired_locations_are_gone(self) -> None:
         text = body("source-material-guide")
-        assert "/tmp/sdpm" not in text
+        assert "/tmp/sdpm" not in text  # nosec B108 - asserts the path is absent, does not use it
         assert "Phase 1" not in text
 
     def test_it_names_the_import_bundle(self) -> None:
