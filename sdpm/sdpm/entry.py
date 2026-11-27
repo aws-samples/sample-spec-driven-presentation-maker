@@ -420,9 +420,8 @@ def start_composing(
     static = _composer_static(mode)
     if collection is None:
         collection = guide_collection()
-    guides = guide_payload(collection, _ROLE_TAGS[f"composer-{mode}"])
     if deck_dir is None or str(deck_dir) == "":
-        return {"static": static, **guides}
+        return {"static": static, **guide_payload(collection, _ROLE_TAGS[f"composer-{mode}"])}
 
     from sdpm.api import check_specs
     from sdpm.engine.schema import deck_output_format
@@ -446,6 +445,8 @@ def start_composing(
             "mode": fmt,
         }
 
+    # After the four failure branches: they return no guide payload, so it is built here.
+    guides = guide_payload(collection, _ROLE_TAGS[f"composer-{mode}"])
     specs = deck_path / "specs"
     slides_dir = deck_path / "slides"
     suffix = "html" if mode == "html" else "json"

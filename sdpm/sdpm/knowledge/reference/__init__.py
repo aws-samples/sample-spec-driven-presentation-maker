@@ -212,6 +212,12 @@ TAGS = (
 #: guide inflates every prompt on that surface. Well above every bundled guide.
 GUIDE_MAX_BYTES = 64 * 1024
 
+#: Cap on one guide's description and on a guide name. Every description rides in every
+#: listing, and a listing rides in every ``start_*`` return, so an unbounded description
+#: inflates that payload as surely as a body would. The longest bundled one is 193.
+GUIDE_DESCRIPTION_MAX = 400
+GUIDE_NAME_MAX = 100
+
 _GUIDE_KEYS = ("description", "tags", "always")
 _FM_KEY_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_-]*):(.*)$")
 
@@ -225,9 +231,10 @@ def is_guide_name(name: Any) -> bool:
     """
     return (
         isinstance(name, str)
-        and name != ""
+        and name.strip() == name != ""
+        and len(name) <= GUIDE_NAME_MAX
         and "." not in name
-        and "\x00" not in name
+        and not any(ord(ch) < 32 or ord(ch) == 127 for ch in name)
         and PureWindowsPath(name).name == name  # Windows rules also catch "/" and "C:"
     )
 
@@ -320,6 +327,8 @@ def guide_meta(name: str, text: str) -> dict[str, Any]:
 
     description = entries.get("description")
     if not isinstance(description, str) or not description.strip('"').strip():
+        return invalid("description")
+    if len(description.strip('"').strip()) > GUIDE_DESCRIPTION_MAX:
         return invalid("description")
 
     raw_tags = entries.get("tags")

@@ -562,10 +562,15 @@ def _rejected_guide(name: str, text: str) -> Optional[Dict[str, Any]]:
 
 @app.get("/guides")
 def list_guides() -> Dict[str, Any]:
-    """The caller's guides merged over the bundled ones, with any invalid entry named."""
+    """The caller's guides merged over the bundled ones, with any invalid entry named.
+
+    ``?role=<tag>`` narrows the list to one role; an unknown role is an error, not an
+    empty list.
+    """
     from sdpm.knowledge.reference import guides_listing
 
-    return guides_listing(_guide_collection(get_user_id(app.current_event)))
+    role = app.current_event.get_query_string_value("role") or ""
+    return guides_listing(_guide_collection(get_user_id(app.current_event)), role)
 
 
 @app.post("/guides/user")

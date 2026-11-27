@@ -144,3 +144,46 @@ class TestCacheKey:
         resolve_parts(parts, mcp_client=client, context={}, enable_cache=False, user_id="u1")
         assert len(client.calls) == before
         assert [name for name, _ in client.calls].count("start_composing") == 1
+
+
+class TestAFailedOuterCallLeavesNothingStale:
+    """The inner value must not outlive a failed outer call.
+
+    The inner source is resolved before the outer tool is called. If it were process-cached
+    there, a failure of the outer call would leave the names behind, and the next turn would
+    ask read_guides for guides the collection no longer holds — which raises, and takes the
+    whole part list with it, so the agent would run with an empty system prompt.
+    """
+
+    class FlakyMCP(FakeMCP):
+        def __init__(self, must_read, fail_read=True):
+            super().__init__(must_read)
+            self.fail_read = fail_read
+
+        def call_tool_sync(self, tool_use_id, name, arguments):
+            if name == "read_guides" and self.fail_read:
+                self.calls.append((name, arguments))
+                return {"status": "error", "content": [{"text": "boom"}]}
+            return super().call_tool_sync(tool_use_id, name, arguments)
+
+    def test_the_names_are_not_cached_by_the_failed_attempt(self):
+        parts = guide_parts()
+        first = self.FlakyMCP(["my-rules"])
+        with pytest.raises(RuntimeError):
+            resolve_parts(parts, mcp_client=first, context={}, enable_cache=False, user_id="u1")
+
+        # The collection changed between turns: a different guide is mandatory now.
+        second = self.FlakyMCP(["verify"], fail_read=False)
+        system, _ = resolve_parts(parts, mcp_client=second, context={}, enable_cache=False, user_id="u1")
+        asked = next(args["names"] for name, args in second.calls if name == "read_guides")
+        assert asked == ["verify"], "the failed turn pinned the old names"
+        assert "# Guide: verify" in system
+
+    def test_a_prefetch_that_fails_caches_nothing(self):
+        parts = guide_parts()
+        client = self.FlakyMCP(["my-rules"])
+        with pytest.raises(RuntimeError):
+            prefetch_sources(parts, client, "u1")
+        later = self.FlakyMCP(["verify"], fail_read=False)
+        resolve_parts(parts, mcp_client=later, context={}, enable_cache=False, user_id="u1")
+        assert next(args["names"] for name, args in later.calls if name == "read_guides") == ["verify"]

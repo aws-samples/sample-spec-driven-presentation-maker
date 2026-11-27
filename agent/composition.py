@@ -215,7 +215,10 @@ def _resolved_args(
         if not isinstance(value, Source):
             resolved[key] = value
             continue
-        text = _resolve_source(value, mcp_client, context, memo, user_id)
+        # Not process-cached: the inner value would outlive a failed outer call, and the
+        # next turn would call the outer tool with names the collection no longer holds.
+        # Nothing is lost — the outer source's own cache entry covers the repeat call.
+        text = _resolve_source(value, mcp_client, context, memo, user_id, use_process_cache=False)
         try:
             resolved[key] = json.loads(text)
         except (json.JSONDecodeError, TypeError):
@@ -225,11 +228,12 @@ def _resolved_args(
 
 def _resolve_source(
     source: Source, mcp_client, context: dict, memo: dict | None = None, user_id: str | None = None,
+    use_process_cache: bool = True,
 ) -> str:
     if source.type == "file":
         return _read_file(source.value)
     if source.type == "mcp":
-        cache_key = _process_cache_key(source, user_id)
+        cache_key = _process_cache_key(source, user_id) if use_process_cache else None
         if cache_key is not None:
             with _PROCESS_CACHE_LOCK:
                 cached = _PROCESS_CACHE.get(cache_key)

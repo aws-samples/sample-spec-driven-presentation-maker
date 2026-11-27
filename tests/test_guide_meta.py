@@ -235,3 +235,38 @@ class TestInvalidCategories:
         # Precedence: a bad tag (6) is reported even on an oversize guide (8).
         text = guide("description: d\ntags: [review]", body="x" * (GUIDE_MAX_BYTES + 1))
         assert self.category("big", text) == "tag-value"
+
+
+class TestSizeOfWhatRidesInEveryListing:
+    """A description rides in every listing, and a listing rides in every start_* return."""
+
+    def test_a_description_at_the_cap_is_valid(self):
+        from sdpm.knowledge.reference import GUIDE_DESCRIPTION_MAX
+
+        front = f"description: {'d' * GUIDE_DESCRIPTION_MAX}\ntags: [composer]"
+        assert "category" not in guide_meta("x", guide(front))
+
+    def test_a_longer_description_is_invalid(self):
+        from sdpm.knowledge.reference import GUIDE_DESCRIPTION_MAX
+
+        front = f"description: {'d' * (GUIDE_DESCRIPTION_MAX + 1)}\ntags: [composer]"
+        assert guide_meta("x", guide(front))["category"] == "description"
+
+    def test_the_cap_is_above_every_bundled_description(self):
+        from pathlib import Path
+
+        from sdpm.knowledge.reference import GUIDE_DESCRIPTION_MAX
+
+        longest = max(
+            len(guide_meta(p.stem, p.read_text(encoding="utf-8"))["description"])
+            for p in Path("sdpm/references/guides").glob("*.md")
+        )
+        assert longest <= GUIDE_DESCRIPTION_MAX
+
+    @pytest.mark.parametrize("name", ["a\tb", "a\nb", " a", "a ", "x" * 101, "C:name"])
+    def test_a_name_that_is_not_one_clean_component_is_rejected(self, name):
+        assert is_guide_name(name) is False
+
+    def test_an_interior_space_is_still_a_name(self):
+        # No stricter than REQ-2.5 states: a style name admits one, and so does a path.
+        assert is_guide_name("house rules") is True

@@ -14,6 +14,12 @@ export async function POST(req: Request) {
   if (!text) {
     return Response.json({ error: "name and text required" }, { status: 400 })
   }
+  // The frontmatter grammar is the engine's, so it is checked when the guide is read and
+  // reported in the listing. The one mistake worth catching here is the common one: a file
+  // with no frontmatter at all, which would be excluded from every hand-over.
+  if (!text.startsWith("---")) {
+    return Response.json({ error: "a guide starts with a --- frontmatter block" }, { status: 400 })
+  }
   if (!isGuideName(name)) {
     return Response.json({ error: "invalid guide name" }, { status: 400 })
   }

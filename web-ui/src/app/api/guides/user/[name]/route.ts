@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: MIT-0
 /** Local User Guide API — delete or rename a guide of the user's own. */
 import fs from "fs"
-import path from "path"
 import { getUserGuidesDir } from "@/lib/local/sdpmPaths"
+import { resolveWithin } from "@/lib/local/contained"
 import { isGuideName } from "@/lib/local/guideName"
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ name: string }> }) {
@@ -12,7 +12,11 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ name
     return Response.json({ error: "invalid guide name" }, { status: 400 })
   }
 
-  const filePath = path.join(getUserGuidesDir(), `${name}.md`)
+  // resolveWithin, like the sibling POST: a symlink leading out of the directory is refused.
+  const filePath = resolveWithin(getUserGuidesDir(), `${name}.md`)
+  if (!filePath) {
+    return Response.json({ error: "invalid guide name" }, { status: 400 })
+  }
   if (!fs.existsSync(filePath)) {
     return Response.json({ error: "guide not found" }, { status: 404 })
   }
@@ -30,8 +34,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ name: 
   }
 
   const dir = getUserGuidesDir()
-  const oldPath = path.join(dir, `${name}.md`)
-  const newPath = path.join(dir, `${newName}.md`)
+  const oldPath = resolveWithin(dir, `${name}.md`)
+  const newPath = resolveWithin(dir, `${newName}.md`)
+  if (!oldPath || !newPath) {
+    return Response.json({ error: "invalid guide name" }, { status: 400 })
+  }
 
   if (!fs.existsSync(oldPath)) {
     return Response.json({ error: "guide not found" }, { status: 404 })

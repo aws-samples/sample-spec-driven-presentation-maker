@@ -567,10 +567,10 @@ def start_composing(
     from sdpm.engine.schema import read_deck_format
     from sdpm.entry import start_composing as _start
 
-    collection = _guide_collection(_get_user_id())
     if not deck_id or not deck_id.strip():
-        return json.dumps(_start(mode=mode, collection=collection), ensure_ascii=False)
+        return json.dumps(_start(mode=mode, collection=_guide_collection(_get_user_id())), ensure_ascii=False)
     _check_deck_access(deck_id, action="generate_pptx")
+    collection = _guide_collection(_get_user_id())
 
     with tempfile.TemporaryDirectory() as tmpdir:
         root = Path(tmpdir)
