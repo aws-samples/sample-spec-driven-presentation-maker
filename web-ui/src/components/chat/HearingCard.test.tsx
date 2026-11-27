@@ -48,7 +48,6 @@ function renderCard(props: Partial<Parameters<typeof HearingCard>[0]> = {}) {
 describe("HearingCard", () => {
   beforeEach(() => { vi.useFakeTimers() })
   afterEach(() => {
-    cleanup()
     vi.useRealTimers()
   })
 
@@ -247,7 +246,6 @@ describe("HearingCard", () => {
 })
 
 describe("ChatMessage renders hearing cards", () => {
-  afterEach(cleanup)
 
   const hearingBlock = (input: Record<string, unknown>) => [{ type: "tool" as const, tool: { toolUseId: "t1", name: "hearing", input, status: "success" as const } }]
 

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT-0
 import { StrictMode } from "react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { cleanup, render, waitFor } from "@testing-library/react"
+import { render, waitFor } from "@testing-library/react"
 import { AnimatedSlidePreview } from "./AnimatedSlidePreview"
 import { resetAnimationSchedulerForTests } from "./animationScheduler"
 
@@ -35,7 +35,6 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  cleanup()
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
 })

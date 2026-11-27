@@ -3,7 +3,7 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { createRef } from "react"
-import { act, cleanup, fireEvent, screen } from "@testing-library/react"
+import { act, fireEvent, screen } from "@testing-library/react"
 import { renderWithIntl } from "@/test/renderWithIntl"
 import type { PickerItem } from "@/lib/slashToken"
 import { ChatInput, type ChatInputHandle, type ChatInputProps } from "./ChatInput"
@@ -56,7 +56,6 @@ function changeValue(textarea: HTMLTextAreaElement, value: string) {
 }
 
 afterEach(() => {
-  cleanup()
   localStorage.clear()
   vi.clearAllMocks()
 })

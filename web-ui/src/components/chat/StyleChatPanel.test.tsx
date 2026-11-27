@@ -11,8 +11,8 @@
  */
 
 import { forwardRef, useImperativeHandle } from "react"
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react"
+import { beforeEach, describe, expect, it, vi } from "vitest"
+import { act, fireEvent, screen, waitFor } from "@testing-library/react"
 import { renderWithIntl } from "@/test/renderWithIntl"
 import type { SendMessageOptions, ToolUseCallbackData } from "@/hooks/useChatStream"
 
@@ -54,7 +54,6 @@ const firstSent = () => (sendMessage.mock.calls[0] as unknown[])[0] as string
 
 describe("StyleChatPanel naming", () => {
   beforeEach(() => { vi.clearAllMocks(); streamState.isLoading = false })
-  afterEach(() => { cleanup() })
 
   it("names the open style on the first message", async () => {
     renderWithIntl(<StyleChatPanel styleId="brand-blue" />)
@@ -76,7 +75,6 @@ describe("StyleChatPanel naming", () => {
 
 describe("StyleChatPanel send", () => {
   beforeEach(() => { vi.clearAllMocks(); streamState.isLoading = false; onSendResult.current = undefined })
-  afterEach(() => { cleanup() })
 
   it("lets the input clear as soon as a message is sent, before the agent's turn ends", async () => {
     sendMessage.mockImplementationOnce(() => new Promise<boolean>(() => {}))

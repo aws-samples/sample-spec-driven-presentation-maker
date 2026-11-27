@@ -1,12 +1,10 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 
-import { afterEach, describe, expect, it, vi } from "vitest"
-import { cleanup, fireEvent, screen } from "@testing-library/react"
+import { describe, expect, it, vi } from "vitest"
+import { fireEvent, screen } from "@testing-library/react"
 import { renderWithIntl } from "@/test/renderWithIntl"
 import { HtmlDeckPlayer, deckUrlAtSlide } from "./HtmlDeckPlayer"
-
-afterEach(cleanup)
 
 const URL_1 = "https://bucket.s3.ap-northeast-1.amazonaws.com/html/d1/abc.html?X-Amz-Signature=1"
 

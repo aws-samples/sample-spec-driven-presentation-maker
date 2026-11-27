@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT-0
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react"
+import { fireEvent, screen, waitFor } from "@testing-library/react"
 import { renderWithIntl } from "@/test/renderWithIntl"
 import { SessionPickerDialog } from "./SessionPickerDialog"
 import type { KiroSessionsResponse } from "@/lib/local/kiro-sessions.types"
@@ -58,7 +58,6 @@ describe("SessionPickerDialog", () => {
   })
 
   afterEach(() => {
-    cleanup()
     vi.unstubAllGlobals()
     vi.clearAllMocks()
   })

@@ -6,7 +6,7 @@
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react"
+import { fireEvent, screen, waitFor } from "@testing-library/react"
 import { toast } from "sonner"
 import { renderWithIntl } from "@/test/renderWithIntl"
 
@@ -17,7 +17,6 @@ import { getAgentEngine, setAgentEngine } from "@/services/localService"
 import { LocalEngineSetting } from "./LocalEngineSetting"
 
 afterEach(() => {
-  cleanup()
   vi.clearAllMocks()
 })
 

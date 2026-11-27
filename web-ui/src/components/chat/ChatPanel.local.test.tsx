@@ -13,7 +13,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { act, cleanup, screen, waitFor } from "@testing-library/react"
+import { act, screen, waitFor } from "@testing-library/react"
 import { renderWithIntl } from "@/test/renderWithIntl"
 import en from "../../../messages/en.json"
 
@@ -60,7 +60,6 @@ beforeEach(() => {
   })
 })
 afterEach(() => {
-  cleanup()
   vi.unstubAllGlobals()
 })
 

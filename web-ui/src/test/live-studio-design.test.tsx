@@ -5,8 +5,8 @@
  * Verifies agent tokens, theme behavior, primary actions, and semantic surfaces.
  */
 
-import { afterEach, describe, it, expect } from "vitest"
-import { cleanup, screen, fireEvent } from "@testing-library/react"
+import { describe, it, expect } from "vitest"
+import { screen, fireEvent } from "@testing-library/react"
 import { renderWithIntl } from "@/test/renderWithIntl"
 import { HearingCard } from "@/components/chat/HearingCard"
 import fs from "fs"
@@ -96,7 +96,6 @@ describe("HearingCard — achromatic + five-color spine", () => {
     ],
     onSubmit: () => {},
   }
-  afterEach(cleanup)
 
   it("renders a 3px vertical five-color spine", () => {
     const { container } = renderWithIntl(<HearingCard {...baseProps} />)

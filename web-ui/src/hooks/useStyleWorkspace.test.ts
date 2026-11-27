@@ -28,7 +28,8 @@ async function openCalm() {
 describe("useStyleWorkspace preview", () => {
   beforeEach(() => { vi.clearAllMocks() })
   afterEach(async () => {
-    // Unmount first: vitest runs without globals, so Testing Library's auto-cleanup is off.
+    // Unmount first, before the hashchange below. The shared afterEach in src/test/setup.ts
+    // runs after this one, so it would be too late here.
     // A hook still mounted here would re-render on the hashchange below, after jsdom is gone.
     cleanup()
     window.location.hash = ""

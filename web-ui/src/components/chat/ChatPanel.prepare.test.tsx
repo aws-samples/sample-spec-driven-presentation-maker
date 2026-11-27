@@ -9,7 +9,7 @@
 
 import { createRef } from "react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react"
+import { act, fireEvent, screen, waitFor } from "@testing-library/react"
 import { renderWithIntl } from "@/test/renderWithIntl"
 import { FakeWebSocket } from "@/test/fakeWebSocket"
 
@@ -71,7 +71,6 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  cleanup()
   vi.useRealTimers()
   vi.unstubAllGlobals()
 })

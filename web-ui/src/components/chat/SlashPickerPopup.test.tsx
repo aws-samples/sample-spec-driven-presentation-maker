@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT-0
 
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { cleanup, fireEvent, screen, within } from "@testing-library/react"
+import { fireEvent, screen, within } from "@testing-library/react"
 import { renderWithIntl } from "@/test/renderWithIntl"
 import { FORMAT_HTML_ITEM, type PickerItem } from "@/lib/slashToken"
 import { SlashPickerPopup, placeSlashPanel, type SlashPickerPopupProps } from "./SlashPickerPopup"
@@ -46,7 +46,6 @@ function renderPopup(overrides: Partial<SlashPickerPopupProps> = {}) {
 }
 
 afterEach(() => {
-  cleanup()
   document.body.querySelectorAll("textarea").forEach((textarea) => textarea.remove())
 })
 

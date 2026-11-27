@@ -4,8 +4,8 @@
  * StyleSlidePreview tests — splitStyleSlides pure function + component rendering.
  */
 
-import { describe, it, expect, afterEach, beforeAll, afterAll, vi } from "vitest"
-import { screen, cleanup } from "@testing-library/react"
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest"
+import { screen } from "@testing-library/react"
 import { render } from "@testing-library/react"
 import { renderWithIntl } from "@/test/renderWithIntl"
 
@@ -14,8 +14,6 @@ vi.mock("@/services/deckService", () => ({ createReview: vi.fn() }))
 
 import { ReviewProvider } from "@/components/review/ReviewProvider"
 import { splitStyleSlides, StyleSlidePreview, buildCoverDoc } from "./StyleSlidePreview"
-
-afterEach(cleanup)
 
 describe("splitStyleSlides", () => {
   it("splits 3-slide HTML into 3 entries", () => {

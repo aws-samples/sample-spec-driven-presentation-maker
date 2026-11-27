@@ -1,7 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 import { act, cleanup } from "@testing-library/react"
 import { renderWithIntl } from "@/test/renderWithIntl"
 
@@ -45,7 +45,6 @@ describe("ReviewProvider", () => {
     localStorage.clear()
     vi.clearAllMocks()
   })
-  afterEach(cleanup)
 
   it("useReview is null without a provider", () => {
     renderWithIntl(<Capture />)

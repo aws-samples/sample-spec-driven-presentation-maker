@@ -11,8 +11,8 @@
  */
 
 import { createRef } from "react"
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react"
+import { beforeEach, describe, expect, it, vi } from "vitest"
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react"
 import { renderWithIntl } from "@/test/renderWithIntl"
 import { deckSessionId, ownerPrefix } from "@/lib/sessionId"
 import composerNote from "@/test/fixtures/composerNote.json"
@@ -76,7 +76,6 @@ describe("ChatPanel session ids (Cloud)", () => {
     getChatHistory.mockResolvedValue({ messages: [], truncated: false })
     invokeAgentCore.mockResolvedValue("")
   })
-  afterEach(() => cleanup())
 
   it("gives a new chat an id with the user's prefix", async () => {
     const id = await sentSessionId({ deckId: "new" })
@@ -113,7 +112,6 @@ describe("ChatPanel background compose (Cloud)", () => {
     Element.prototype.scrollIntoView = vi.fn()
     getChatHistory.mockResolvedValue({ messages: [], truncated: false })
   })
-  afterEach(() => cleanup())
 
   it("shows the background line between turns, composer notes and steer delivery", async () => {
     let h: Handlers | undefined
@@ -202,7 +200,6 @@ describe("ChatPanel steers (Cloud)", () => {
     Element.prototype.scrollIntoView = vi.fn()
     getChatHistory.mockResolvedValue({ messages: [], truncated: false })
   })
-  afterEach(() => cleanup())
 
   const textbox = () => screen.getByRole("textbox", { name: en.chatInput.inputLabel }) as HTMLTextAreaElement
   const queue = () => screen.queryByRole("region", { name: en.chat.steerQueue })

@@ -1,12 +1,11 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 
-import { cleanup, render, waitFor } from "@testing-library/react"
+import { render, waitFor } from "@testing-library/react"
 import { afterEach, expect, it, vi } from "vitest"
 import { DeckDefs, type DeckDefsStatus } from "./DeckDefs"
 
 afterEach(() => {
-  cleanup()
   vi.unstubAllGlobals()
 })
 

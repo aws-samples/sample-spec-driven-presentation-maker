@@ -5,12 +5,10 @@
  * HTML content → iframe (StyleSlidePreview), markdown content → prose.
  */
 
-import { describe, it, expect, afterEach, beforeAll, afterAll, vi } from "vitest"
-import { cleanup } from "@testing-library/react"
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest"
+
 import { renderWithIntl } from "@/test/renderWithIntl"
 import { SpecMarkdownPreview } from "./SpecMarkdownPreview"
-
-afterEach(cleanup)
 
 // Mock ResizeObserver for JSDOM
 const originalRO = globalThis.ResizeObserver

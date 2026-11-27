@@ -11,7 +11,7 @@
 import fs from "fs"
 import path from "path"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react"
+import { act, fireEvent, screen, waitFor } from "@testing-library/react"
 import { renderWithIntl } from "@/test/renderWithIntl"
 
 const { invokeAgentCore, createReview, getChatHistory } = vi.hoisted(() => ({
@@ -107,7 +107,6 @@ describe("ChatPanel change request", () => {
     createReview.mockResolvedValue({ id: ID, message: MESSAGE })
   })
   afterEach(() => {
-    cleanup()
     vi.unstubAllGlobals()
   })
 

@@ -7,8 +7,8 @@
  * ChatPanel.local.test.tsx.
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react"
+import { beforeEach, describe, expect, it, vi } from "vitest"
+import { act, fireEvent, screen, waitFor } from "@testing-library/react"
 import { renderWithIntl } from "@/test/renderWithIntl"
 import { deckSessionId } from "@/lib/sessionId"
 
@@ -100,7 +100,6 @@ beforeEach(() => {
   Element.prototype.scrollIntoView = vi.fn()
   getChatHistory.mockResolvedValue({ messages: HISTORY, truncated: false })
 })
-afterEach(() => cleanup())
 
 describe("ChatPanel resume (Cloud)", () => {
   it("cuts the history at the work's prompt, replays it once and follows it live until idle", async () => {

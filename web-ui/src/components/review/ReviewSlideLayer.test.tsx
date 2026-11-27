@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT-0
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { act, cleanup, fireEvent, screen } from "@testing-library/react"
+import { act, fireEvent, screen } from "@testing-library/react"
 import { renderWithIntl } from "@/test/renderWithIntl"
 
 const { toastMock } = vi.hoisted(() => ({
@@ -64,7 +64,6 @@ describe("ReviewSlideLayer", () => {
     vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue(BOX)
   })
   afterEach(() => {
-    cleanup()
     vi.restoreAllMocks()
   })
 

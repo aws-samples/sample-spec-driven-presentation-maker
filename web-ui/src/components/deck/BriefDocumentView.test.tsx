@@ -5,12 +5,10 @@
  * materials table, HEX swatches, and approval status derivation.
  */
 
-import { describe, it, expect, afterEach } from "vitest"
-import { screen, cleanup } from "@testing-library/react"
+import { describe, it, expect } from "vitest"
+import { screen } from "@testing-library/react"
 import { renderWithIntl } from "@/test/renderWithIntl"
 import { BriefDocumentView } from "./BriefDocumentView"
-
-afterEach(cleanup)
 
 describe("BriefDocumentView", () => {
   describe("arbitrary markdown rendering", () => {

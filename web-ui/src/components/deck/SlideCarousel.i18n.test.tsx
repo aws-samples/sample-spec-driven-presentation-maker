@@ -1,7 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 
-import { afterEach, describe, expect, it, vi } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import { cleanup, screen } from "@testing-library/react"
 import { renderWithIntl } from "@/test/renderWithIntl"
 import type { SlidePreview } from "@/services/deckService"
@@ -29,7 +29,6 @@ function renderHeader(locale: "en" | "ja", count = 7) {
 }
 
 describe("SlideCarousel — header i18n", () => {
-  afterEach(cleanup)
 
   it("translates the slide count, owner and Folder button in Japanese", () => {
     renderHeader("ja")

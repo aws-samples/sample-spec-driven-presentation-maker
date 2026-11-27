@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT-0
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { act, cleanup, render, waitFor } from "@testing-library/react"
+import { act, render, waitFor } from "@testing-library/react"
 import { AnimatedSlidePreview } from "./AnimatedSlidePreview"
 import { resetAnimationSchedulerForTests } from "./animationScheduler"
 
@@ -41,7 +41,6 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  cleanup()
   resetAnimationSchedulerForTests()
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
@@ -249,7 +248,6 @@ describe("AnimatedSlidePreview performance gating", () => {
     expect(wasFetched("/compose.json")).toBe(true)
   })
 
-
   it("falls back to per-slide defs when deck-level defs are unavailable", async () => {
     mockFetch({
       version: 1,
@@ -342,7 +340,6 @@ describe("AnimatedSlidePreview performance gating", () => {
     expect(rendered.container.querySelector(".asp-overlay")).toBeNull()
   })
 })
-
 
 class ControlledObserver implements IntersectionObserver {
   static instances: ControlledObserver[] = []

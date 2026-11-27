@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT-0
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react"
+import { act, fireEvent, screen, waitFor } from "@testing-library/react"
 import { renderWithIntl } from "@/test/renderWithIntl"
 import { OutlineChatContext, type OutlineChatBridge } from "./OutlineChatContext"
 import { OutlineView } from "./OutlineView"
@@ -58,7 +58,6 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  cleanup()
   localStorage.clear()
 })
 

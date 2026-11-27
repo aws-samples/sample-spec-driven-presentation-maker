@@ -1,7 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
-import { describe, it, expect, afterEach, beforeAll, vi } from "vitest"
-import { screen, fireEvent, cleanup } from "@testing-library/react"
+import { describe, it, expect, beforeAll, vi } from "vitest"
+import { screen, fireEvent } from "@testing-library/react"
 import { renderWithIntl as render } from "@/test/renderWithIntl"
 import { ModelPicker } from "./ModelPicker"
 import type { AllowedModel } from "@/lib/allowedModels"
@@ -30,7 +30,6 @@ function open() {
 }
 
 describe("ModelPicker", () => {
-  afterEach(cleanup)
 
   it("renders a flat list when no model is recommended", () => {
     render(<ModelPicker models={flat} value="m-a" onChange={() => {}} />)
