@@ -347,6 +347,39 @@ def guide_meta(name: str, text: str) -> dict[str, Any]:
     }
 
 
+def build_collection(sources: list[tuple[str, list[dict[str, str]]]]) -> dict[str, Any]:
+    """Merge labelled guide groups into the one collection every guide surface reads.
+
+    Each group is ``(source, entries)`` — ``source`` being ``"user"`` or ``"builtin"``,
+    each entry ``{"name", "location", "text"}``. Pass the user's group first: the first
+    valid entry of each name wins, so a user guide shadows the bundled guide of that name
+    for listing, read-by-name and automatic hand-over alike.
+
+    Returns ``{"valid": {name: meta}, "invalid": [{"path", "category"}]}``. An invalid
+    entry never wins a name — resolution continues to the next source — and never fails
+    the call: the valid guides beside it are still listed, read and handed over.
+
+    An entry whose name a previous group already won is not parsed: it is unreachable, so
+    reporting its metadata would only add noise a caller cannot act on.
+
+    Pure function. The caller supplies the groups, which is what lets the remote merge S3
+    bodies and the local merge file reads through this same rule.
+    """
+    valid: dict[str, dict[str, Any]] = {}
+    invalid: list[dict[str, str]] = []
+    for source, entries in sources:
+        for entry in entries:
+            name = entry["name"]
+            if name in valid:
+                continue
+            meta = guide_meta(name, entry["text"])
+            if "category" in meta:
+                invalid.append({"path": entry["location"], "category": meta["category"]})
+                continue
+            valid[name] = {**meta, "source": source}
+    return {"valid": valid, "invalid": invalid}
+
+
 def list_category(category_dir: Path) -> list[dict[str, str]]:
     """List documents in a category directory with descriptions.
 
