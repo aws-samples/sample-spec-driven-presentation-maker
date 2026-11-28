@@ -137,7 +137,7 @@ Native PPTX chart (editable in PowerPoint).
 - `path`: path commands (`M`, `L`, `C`, `Q`, `A`, `Z`). Coordinates are shape-interior px (0,0 = top-left, width,height = bottom-right)
 - `paths`: multi-path alternative (array of path arrays or objects with `commands` and `fill`)
 - `customGeometry`: raw XML string also accepted (`path`/`paths` take priority)
-- Supports `fill`, `line`, `lineWidth`, `lineGradient`, `lineOpacity`, `dashStyle`, `opacity`, effects
+- Supports `fill`, `line`, `lineWidth`, `lineGradient`, `lineOpacity`, `dashStyle`, `opacity`, `patternFill`, `gradient` (including the `circle` / `rect` / `shape` path types), effects
 - `headEnd`/`tailEnd`: arrow heads on open paths (`"triangle"`, `"arrow"`, `"stealth"`, etc.)
 - `text`, `items`, `fontSize`, `align`, `verticalAlign`, `marginLeft/Top/Right/Bottom`: text inside freeform
 - For command details, control points, multi-path, fill mode, and coordinate system, call `read_guides(["freeform"])`

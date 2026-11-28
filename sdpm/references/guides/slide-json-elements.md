@@ -192,6 +192,10 @@ Expands an external JSON file's elements array. Draw order is controlled by posi
 - `verticalAlign`: `top`, `middle`, `bottom` (default: middle for shape)
 - `rotation`: rotation angle (degrees, clockwise). Base orientation at 0° differs per shape: `arrow_right` points right, `triangle` points up — a right-pointing triangle is `"shape": "triangle", "rotation": 90`
 - `gradient.angle`: gradient angle, clockwise from right. 0°=left→right, 90°=top→bottom, 180°=right→left, 270°=bottom→top. Same convention as block_arc/pie shapes
+- `gradient.type`: `linear` (default — the one `angle` applies to) or a path gradient: `circle` (radial), `rect`, `shape` (follows the outline). A path gradient ignores `angle`
+- `gradient.fillToRect`: where a path gradient's first stop sits, as edge insets in 1/1000 of a percent — `{"l": 50000, "t": 50000, "r": 50000, "b": 50000}` centres it. An omitted side is 0, which puts the focus in the top-left corner. `gradient.tileRect` takes the same four keys and units
+- `gradient.flip`: how a gradient repeats past its region — `x`, `y`, `xy`, `none` (default). `gradient.rotWithShape`: rotate with the shape (default true). `gradient.scaled`: `false` keeps a linear angle geometric instead of stretching it to the bounding box
+- Radial example (sphere shading): `{"type": "circle", "fillToRect": {"l": 50000, "t": 50000, "r": 50000, "b": 50000}, "stops": [{"position": 0, "color": "#FFFFFF"}, {"position": 1, "color": "#102030"}]}`
 - `sendToBack`: render this element BEHIND template placeholders (title/subtitle). Elements normally stack in array order, all in front of placeholders — use this on full-bleed decorative shapes/images that must not cover the title. Works on any element type
 - `circle`: alias for oval. Squared using min(width, height)
 - `arrow_circular` / `arrow_circular_left` / `arrow_circular_left_right`: arc arrows for cycle diagrams
@@ -250,10 +254,13 @@ is found, but you should not produce it in the first place.
   "adjustments": [0.5],
   "arrowStart": "arrow|triangle|stealth|oval|diamond|none",
   "arrowEnd": "arrow|triangle|stealth|oval|diamond|none",
+  "arrowStartWidth": "sm|med|lg", "arrowStartLength": "sm|med|lg",
+  "arrowEndWidth": "sm|med|lg", "arrowEndLength": "sm|med|lg",
   "lineGradient": {"angle": 0, "stops": [...]}
 }
 ```
 
+- `arrowStartWidth` / `arrowStartLength` / `arrowEndWidth` / `arrowEndLength`: arrowhead size, as a step relative to the line width (`med` when omitted). Set them on thick lines, where a `med` head reads as a blunt tip
 - `preset`: connector preset name (e.g. `bentConnector3`, `bentConnector4`, `bentConnector5`)
 - `adjustments`: elbow/curved connector waypoints (0–1 ratio array). Auto-selects bentConnector3/4/5 by count
 - `elbowStart`: first segment direction for elbow connectors. `"horizontal"` (default, H-V-H) or `"vertical"` (V-H-V)
