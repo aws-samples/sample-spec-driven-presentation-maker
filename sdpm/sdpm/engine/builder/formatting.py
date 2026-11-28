@@ -136,6 +136,12 @@ class FormattingMixin:
             if opacity is not None and 0 <= opacity < 1:
                 self._set_fill_opacity(shape, opacity)
 
+        # A pattern replaces whatever fill was just applied. Freeforms reach
+        # pattern fills only here — _add_shape applies its own.
+        pattern_fill = elem.get("patternFill")
+        if pattern_fill:
+            self._apply_pattern_fill(shape, pattern_fill)
+
         line_color = elem.get("line")
         line_width = elem.get("lineWidth", 1)
         line_gradient = elem.get("lineGradient")
@@ -202,6 +208,38 @@ class FormattingMixin:
                 if ln is not None:
                     ln.set('w', str(int(line_width * 12700)))
     
+    def _apply_pattern_fill(self, shape, pattern_fill):
+        """Replace the shape's fill with an <a:pattFill> (hatch, grid, dots)."""
+        from lxml import etree
+        from pptx.oxml.ns import qn
+        sp_pr = shape._element.spPr
+        # Remove existing fill
+        for tag in ('a:solidFill', 'a:gradFill', 'a:noFill', 'a:pattFill'):
+            for el in sp_pr.findall(qn(tag)):
+                sp_pr.remove(el)
+        patt = etree.Element(qn('a:pattFill'))
+        patt.set('prst', pattern_fill.get("pattern", "dkDnDiag"))
+        fg = etree.SubElement(patt, qn('a:fgClr'))
+        fg_srgb = etree.SubElement(fg, qn('a:srgbClr'))
+        fg_srgb.set('val', pattern_fill.get("fgColor", "#FFFFFF").lstrip("#"))
+        bg = etree.SubElement(patt, qn('a:bgClr'))
+        bg_srgb = etree.SubElement(bg, qn('a:srgbClr'))
+        bg_srgb.set('val', pattern_fill.get("bgColor", "#000000").lstrip("#"))
+        # CT_ShapeProperties is an ordered sequence: the fill must come
+        # BEFORE a:ln/a:effectLst. PowerPoint silently ignores fills that
+        # appear out of order (LibreOffice is lenient, so renders hid the
+        # bug). Insert after prstGeom/custGeom when present.
+        anchor = None
+        for tag in ('a:prstGeom', 'a:custGeom', 'a:xfrm'):
+            el = sp_pr.find(qn(tag))
+            if el is not None:
+                anchor = el
+                break
+        if anchor is not None:
+            anchor.addnext(patt)
+        else:
+            sp_pr.insert(0, patt)
+
     def _px_to_emu(self, px):
         """Convert pixels (1920x1080 basis) to EMU."""
         return Emu(int(px * self.EMU_PER_PX))

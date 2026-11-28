@@ -300,6 +300,16 @@ class TestFreeform:
         out = _one(tmp_path, _freeform(gradient=GRADIENT, line="#FFFFFF", path=CLOSED_PATH))
         assert out["gradient"]["angle"] == 45
 
+    def test_pattern_fill_survives_and_precedes_line(self, tmp_path):
+        # The pattern used to be applied on the shape path only, so a freeform
+        # carrying patternFill came out with no fill at all.
+        patt = {"pattern": "ltDnDiag", "fgColor": "#FF0000", "bgColor": "#00FF00"}
+        elem = _freeform(fill=None, patternFill=patt, line="#FFFFFF", path=CLOSED_PATH)
+        assert _one(tmp_path, elem)["patternFill"] == patt
+        (sp,) = _built_shapes(tmp_path / "xml", [elem])
+        tags = _tags(sp._element.spPr)
+        assert tags.index("pattFill") < tags.index("ln")
+
     @pytest.mark.parametrize("dash", ["dash", "long_dash"])
     def test_dash_style_survives_a_second_build(self, tmp_path, dash):
         _assert_dash_stable(tmp_path, _freeform(line="#FFFFFF", dashStyle=dash, path=CLOSED_PATH))
