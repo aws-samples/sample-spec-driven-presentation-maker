@@ -57,6 +57,30 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ### Fixed
 
+- **Japanese text uses the font the deck asked for.** `deck.json` `fonts.fullwidth` reached
+  the run as `<a:latin>`, which PowerPoint consults for Latin script — CJK glyphs resolve
+  through `<a:ea>`, which nothing wrote. Japanese text therefore fell back to the template
+  theme's East Asian font, empty in the bundled templates, so the renderer chose for itself
+  (measured: LibreOffice embedded Noto Sans for a deck that asked for Noto Serif JP), and a
+  Latin font with no CJK glyphs rendered tofu. Every run the builder fonts now names its
+  East Asian typeface too: the inline `{{font=X:...}}` name when given, the deck's fullwidth
+  font otherwise. Covers textboxes, shapes, freeforms, tables, speaker notes and image
+  labels. Runs whose font is inherited on purpose — a title placeholder, an imported
+  `lstStyle` — are unchanged. Local mode and the AWS stack (SdpmRuntime).
+- **`patternFill` works on a freeform.** The pattern was built on the preset-geometry path
+  only, so a freeform carrying `patternFill` came out with no fill at all — the key was
+  accepted and silently dropped, and hatching a cross-section meant drawing the diagonals by
+  hand. Both paths now call one `_apply_pattern_fill`. Local mode and the AWS stack
+  (SdpmRuntime).
+- **The element guide names the gradient and arrowhead keys the builder honours.**
+  `slide-json-elements.md` described `gradient` as an angle and stops, so path gradients
+  (`circle` for a radial, `rect`, `shape`) with their `fillToRect`, `tileRect`, `flip`,
+  `rotWithShape` and `scaled` did not exist for a composer, which writes slide JSON from the
+  guide and nothing else; arrowhead sizes on a line (`arrowEndWidth`, `arrowEndLength` and
+  their `arrowStart*` pair) were equally silent. One deck shaded a sphere with 2,800 dots and
+  printed "PowerPoint has no radial gradient" on the slide. The guide now names them, with a
+  radial example, and a contract test fails when the guide stops naming a key either source
+  reads. No build behaviour changes.
 - **Built PPTX decks carry a document title and language.** The PPTX title (`dc:title`)
   came from `deck.json` `title`, or, without one, from the first slide's title placeholder.
   The orchestrator did not write `title`, and a cover drawn with elements keeps no title
