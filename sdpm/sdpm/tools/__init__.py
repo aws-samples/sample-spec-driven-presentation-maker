@@ -19,7 +19,6 @@ from typing import Annotated, Any, Literal
 
 from pydantic import Field
 
-from sdpm.config import REFERENCES_DIR as _REFERENCES_DIR
 
 
 def start_presentation() -> dict[str, Any]:
@@ -268,13 +267,32 @@ def list_templates() -> dict[str, Any]:
     return {"templates": list_templates_with_metadata(templates_dirs, metadata, get_builtin_template_notes())}
 
 
-def read_guides(
-    names: Annotated[list[str], Field(description='Guide names to read.')],
+def list_guides(
+    role: Annotated[str, Field(description='Role tag to filter by: orchestrator, composer, composer-pptx, composer-html, style, translate, management. Empty lists every guide.')] = "",
 ) -> dict[str, Any]:
-    """Read guide documents."""
-    from sdpm.knowledge.reference import read_docs
+    """Which guides exist, what each one decides, and which ones a role must read.
 
-    return {"documents": read_docs(_REFERENCES_DIR / "guides", names)}
+    Call it when you need a guide you were not given, or when asked about sdpm itself.
+    Pass a name from here to read_guides.
+    """
+    from sdpm.entry import guide_collection
+    from sdpm.knowledge.reference import guides_listing
+
+    return guides_listing(guide_collection(), role)
+
+
+def read_guides(
+    names: Annotated[list[str], Field(description='Guide names, as list_guides or must_read gave them.')],
+) -> dict[str, Any]:
+    """Read guides by name, returned as one text with a heading per guide.
+
+    The names come from a start_* call's must_read (the guides that role must read before
+    its first step) or from list_guides.
+    """
+    from sdpm.entry import guide_collection
+    from sdpm.knowledge.reference import guides_result
+
+    return guides_result(guide_collection(), names)
 
 
 def code_to_slide(
@@ -363,15 +381,6 @@ def arch_diagram(
     )
 
 
-def _guide_names() -> list[str]:
-    from sdpm.knowledge.reference import list_category
-
-    return [item["name"] for item in list_category(_REFERENCES_DIR / "guides")]
-
-
-# The guide catalogue is small and bundled, so it rides in the tool description
-# instead of costing a list call.
-read_guides.__doc__ = (
-    "Read guide documents — focused references to load when a slide or step calls for one. "
-    "Guides: " + ", ".join(_guide_names()) + "."
-)
+# The guide catalogue used to ride in read_guides' description, because nothing listed
+# the guides. list_guides does now, and a user's own guides would have been missing from
+# a description fixed at import time anyway.

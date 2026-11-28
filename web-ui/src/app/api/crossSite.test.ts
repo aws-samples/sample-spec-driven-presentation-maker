@@ -14,7 +14,7 @@ import { describe, expect, it, vi } from "vitest"
 const sideEffect = vi.fn()
 vi.mock("@/lib/local/acp-process", () => new Proxy({}, { get: (_t, key) => (key === "then" ? undefined : key === "pendingOrigins" ? new Map() : sideEffect) }))
 vi.mock("@/lib/local/kiro-sessions", () => ({ findSession: sideEffect, listSessions: sideEffect }))
-vi.mock("@/lib/local/sdpmPaths", () => ({ getState: sideEffect, updateState: sideEffect, getUserStylesDir: sideEffect, getUserConfigDir: sideEffect, getConfiguredOutputDir: () => null, SDPM_ROOT: "/nonexistent" }))
+vi.mock("@/lib/local/sdpmPaths", () => ({ getState: sideEffect, updateState: sideEffect, getUserStylesDir: sideEffect, getUserGuidesDir: sideEffect, getUserConfigDir: sideEffect, getConfiguredOutputDir: () => null, SDPM_ROOT: "/nonexistent" }))
 vi.mock("child_process", () => ({ execFile: sideEffect, execFileSync: sideEffect, default: { execFile: sideEffect, execFileSync: sideEffect } }))
 
 const routes: [string, () => Promise<{ POST: (req: Request) => Promise<Response> | Response }>][] = [
@@ -26,6 +26,7 @@ const routes: [string, () => Promise<{ POST: (req: Request) => Promise<Response>
   ["agent/steer", () => import("./agent/steer/route")],
   ["attachments", () => import("./attachments/route")],
   ["open", () => import("./open/route")],
+  ["guides/user", () => import("./guides/user/route")],
   ["styles/pin", () => import("./styles/pin/route")],
   ["styles/user", () => import("./styles/user/route")],
   ["templates/user", () => import("./templates/user/route")],
@@ -57,7 +58,7 @@ describe("Local POST routes refuse cross-site requests", () => {
     const req = new Request(`http://127.0.0.1:3000/api/${name}`, {
       method: "POST",
       headers: { origin: "https://evil.example", "content-type": "text/plain" },
-      body: JSON.stringify({ query: "x", deckId: "d", sessionId: "s", messages: [], name: "n", html: "h", pinned: true }),
+      body: JSON.stringify({ query: "x", deckId: "d", sessionId: "s", messages: [], name: "n", html: "h", text: "t", pinned: true }),
     })
     const res = await POST(req)
     expect(res.status).toBe(403)

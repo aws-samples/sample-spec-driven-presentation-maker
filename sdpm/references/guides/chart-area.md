@@ -1,5 +1,6 @@
 ---
 description: "Area chart JSON structure and style overrides — read when slide contains area or stacked area chart"
+tags: [composer-pptx]
 ---
 
 Area charts for volume over time and stacked share of a total.

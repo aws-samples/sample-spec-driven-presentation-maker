@@ -524,6 +524,131 @@ def rename_user_style(style_name: str) -> Dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
+# Guide endpoints
+# ---------------------------------------------------------------------------
+#
+# Same four shapes as the style endpoints, minus the pin: guides have no pins and no
+# default. A guide is validated at write time, not only at read time — a style that fails
+# to parse degrades one deck's look, while a guide that fails to parse is left out of every
+# hand-over, so the author has to learn about it here rather than from a listing later.
+
+
+def _guide_collection(user_id: str) -> Dict[str, Any]:
+    """The caller's own guides over the ones bundled in this deployment."""
+    from sdpm.entry import bundled_guide_entries
+    from sdpm.knowledge.reference import build_collection
+
+    return build_collection([
+        ("user", user_library.list_user_guides(s3_client, BUCKET_NAME, user_id)),
+        ("builtin", bundled_guide_entries()),
+    ])
+
+
+def _rejected_guide(name: str, text: str) -> Optional[Dict[str, Any]]:
+    """The reason a write must be refused, or None.
+
+    One call covers the name, the frontmatter and the size cap, in the order the engine
+    defines, so a guide breaking several is reported by its first cause.
+    """
+    from sdpm.knowledge.reference import guide_meta
+
+    if not isinstance(name, str) or not isinstance(text, str):
+        return {"error": "name and text must be strings"}
+    if not text:
+        return {"error": "text is required"}
+    meta = guide_meta(name, text)
+    if "category" in meta:
+        return {"error": f"Invalid guide ({meta['category']}): {name}"}
+    return None
+
+
+@app.get("/guides")
+def list_guides() -> Dict[str, Any]:
+    """The caller's guides merged over the bundled ones, with any invalid entry named.
+
+    ``?role=<tag>`` narrows the list to one role; an unknown role is an error, not an
+    empty list.
+    """
+    from sdpm.knowledge.reference import guides_listing
+
+    role = app.current_event.get_query_string_value("role") or ""
+    return guides_listing(_guide_collection(get_user_id(app.current_event)), role)
+
+
+@app.post("/guides/user")
+def save_user_guide() -> Dict[str, Any]:
+    """Create or replace one of the caller's guides.
+
+    Body: {"name": str, "text": str}
+    """
+    body = app.current_event.json_body
+    if not isinstance(body, dict):
+        return {"error": 'body must be an object: {"name": str, "text": str}'}, 400
+    name = body.get("name", "")
+    text = body.get("text", "")
+
+    rejected = _rejected_guide(name, text)
+    if rejected is not None:
+        return rejected, 400
+
+    user_id = get_user_id(app.current_event)
+    key = user_library.user_guide_key(user_id, name)
+    s3_client.put_object(Bucket=BUCKET_NAME, Key=key, Body=text.encode("utf-8"), ContentType="text/markdown")
+    return {"saved": name}
+
+
+@app.delete("/guides/user/<guide_name>")
+def delete_user_guide(guide_name: str) -> Dict[str, Any]:
+    """Delete one of the caller's guides."""
+    from sdpm.knowledge.reference import is_guide_name
+
+    if not is_guide_name(guide_name):
+        return {"error": f"Invalid guide name: {guide_name}"}, 400
+
+    user_id = get_user_id(app.current_event)
+    key = user_library.user_guide_key(user_id, guide_name)
+    try:
+        s3_client.head_object(Bucket=BUCKET_NAME, Key=key)
+    except Exception:
+        return {"error": f"Guide not found: {guide_name}"}, 404
+    s3_client.delete_object(Bucket=BUCKET_NAME, Key=key)
+    return {"deleted": guide_name}
+
+
+@app.patch("/guides/user/<guide_name>")
+def rename_user_guide(guide_name: str) -> Dict[str, Any]:
+    """Rename one of the caller's guides.
+
+    Body: {"newName": str}
+    """
+    from sdpm.knowledge.reference import is_guide_name
+
+    new_name = app.current_event.json_body.get("newName", "")
+    if not is_guide_name(guide_name):
+        return {"error": f"Invalid guide name: {guide_name}"}, 400
+    if not is_guide_name(new_name):
+        return {"error": f"Invalid new name: {new_name}"}, 400
+
+    user_id = get_user_id(app.current_event)
+    old_key = user_library.user_guide_key(user_id, guide_name)
+    new_key = user_library.user_guide_key(user_id, new_name)
+
+    try:
+        text_bytes = s3_client.get_object(Bucket=BUCKET_NAME, Key=old_key)["Body"].read()
+    except Exception:
+        return {"error": f"Guide not found: {guide_name}"}, 404
+    try:
+        s3_client.head_object(Bucket=BUCKET_NAME, Key=new_key)
+        return {"error": f"Guide already exists: {new_name}"}, 409
+    except Exception:
+        pass
+
+    s3_client.put_object(Bucket=BUCKET_NAME, Key=new_key, Body=text_bytes, ContentType="text/markdown")
+    s3_client.delete_object(Bucket=BUCKET_NAME, Key=old_key)
+    return {"renamed": {"from": guide_name, "to": new_name}}
+
+
+# ---------------------------------------------------------------------------
 # Template endpoints
 # ---------------------------------------------------------------------------
 

@@ -1,7 +1,6 @@
 ---
-name: import-pptx
 description: "Convert an attached PPTX into an editable deck (invoked when read_attachment returns guideInstruction for import-pptx and user intent is edit)"
-category: guide
+tags: [orchestrator, style, translate, management]
 ---
 
 # Import PPTX (Edit Existing Presentation)

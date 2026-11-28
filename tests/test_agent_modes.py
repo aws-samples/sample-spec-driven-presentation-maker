@@ -97,22 +97,33 @@ def _file_parts(mode):
 
 
 @pytest.mark.parametrize("mode", ["orchestrator", "vibe", "spec"])
-def test_orchestrator_system_carries_deck_spec_before_cache_point(mode):
-    """The deck.json reference is deck-independent: system, inside the cached prefix."""
+def test_orchestrator_system_carries_its_guides_before_cache_point(mode):
+    """The guides are large and identical for a user with none of their own, so they sit
+    inside the cached prefix — and never under ``static``, which is shared across users."""
     parts = MODES[mode].parts
     cache_idx = max(i for i, p in enumerate(parts) if p.cache_point)
-    spec = [i for i, p in enumerate(parts)
-            if p.source.type == "mcp" and p.source.value == "start_presentation" and p.source.pick == "static.deck_spec"]
-    assert len(spec) == 1 and spec[0] < cache_idx
-    assert parts[spec[0]].target == "system"
+    picks = [i for i, p in enumerate(parts)
+             if p.source.type == "mcp" and p.source.pick in ("guides_text", "listing")]
+    assert len(picks) == 2 and max(picks) < cache_idx
+    assert all(parts[i].target == "system" for i in picks)
 
 
-def test_orchestrator_system_prompt_includes_deck_spec():
+@pytest.mark.parametrize("mode", ["orchestrator", "vibe", "spec", "composer", "html_composer", "style_creator"])
+def test_no_guide_bearing_pick_is_under_static(mode):
+    # _process_cache_key shares any static.* pick across every user; guide text is per user.
+    for part in MODES[mode].parts:
+        if part.source.type == "mcp" and part.source.pick in ("guides_text", "listing"):
+            assert not part.source.pick.startswith("static.")
+
+
+def test_orchestrator_system_prompt_includes_the_handed_over_guides():
     client = ContractFakeMCPClient()
     system_prompt, _messages = resolve_parts(
         MODES["orchestrator"].parts, mcp_client=client, context={}, enable_cache=False,
     )
-    assert contract.start_presentation()["static"]["deck_spec"] in system_prompt
+    payload = contract.start_presentation()
+    assert payload["must_read"] == ["deck-json-spec", "story-line"]
+    assert contract.read_guides(payload["must_read"])["guides_text"] in system_prompt
     assert [name for name, _ in client.calls].count("start_presentation") == 1
 
 
@@ -188,31 +199,48 @@ def test_orchestrator_picks_styles_through_list_styles():
         assert all(p.source.pick != "styles" and "styles," not in p.source.pick for p in MODES[name].parts)
 
 
-def test_composer_static_is_workflow_plus_slide_spec_and_cacheable():
+def test_composer_system_is_workflow_plus_its_guides():
     parts = MODES["composer"].parts
-    assert [p.source.value for p in parts] == ["start_composing", "start_composing"]
-    assert [p.source.pick for p in parts] == ["static.workflow", "static.slide_spec"]
-    assert all(p.source.args == {} for p in parts)
+    assert [p.source.value for p in parts] == ["start_composing", "read_guides", "start_composing"]
+    assert [p.source.pick for p in parts] == ["static.workflow", "guides_text", "listing"]
+    # The mandatory names come from the entry call, so no guide is named here.
+    nested = parts[1].source.args["names"]
+    assert (nested.value, nested.args, nested.pick) == ("start_composing", {}, "must_read")
     system_prompt, messages = resolve_parts(parts, mcp_client=ContractFakeMCPClient(), context={}, enable_cache=False)
     assert "# Composer" in system_prompt and "deck.json" in system_prompt
     assert messages == []
 
 
-def test_html_composer_static_is_the_html_mode_of_start_composing():
+def test_html_composer_is_the_html_mode_of_start_composing():
     parts = MODES["html_composer"].parts
-    assert [p.source.value for p in parts] == ["start_composing", "start_composing"]
-    assert [p.source.pick for p in parts] == ["static.workflow", "static.slide_spec"]
-    assert all(p.source.args == {"mode": "html"} for p in parts)
+    assert [p.source.value for p in parts] == ["start_composing", "read_guides", "start_composing"]
+    assert [p.source.pick for p in parts] == ["static.workflow", "guides_text", "listing"]
+    assert parts[1].source.args["names"].args == {"mode": "html"}
     assert all(p.target == "system" for p in parts)
     assert MODES["html_composer"].use_composer is False
     assert MODES["html_composer"].allowed_tools == MODES["composer"].allowed_tools
     client = ContractFakeMCPClient()
     system_prompt, messages = resolve_parts(parts, mcp_client=client, context={}, enable_cache=False)
-    static = contract.start_composing(mode="html")["static"]
+    payload = contract.start_composing(mode="html")
+    assert payload["must_read"] == ["slide-html-spec", "verify"]
     assert "# Composer (HTML)" in system_prompt
-    assert static["workflow"] in system_prompt and static["slide_spec"] in system_prompt
-    assert client.calls == [("start_composing", {"mode": "html"})]
+    assert payload["static"]["workflow"] in system_prompt
+    assert contract.read_guides(payload["must_read"])["guides_text"] in system_prompt
+    assert client.calls == [
+        ("start_composing", {"mode": "html"}),
+        ("read_guides", {"names": ["slide-html-spec", "verify"]}),
+    ]
     assert messages == []
+
+
+def test_style_creator_is_handed_the_style_guides():
+    parts = MODES["style_creator"].parts
+    picks = [(p.source.value, p.source.pick) for p in parts if p.source.type == "mcp"]
+    assert picks == [
+        ("start_style", "static.workflow"),
+        ("read_guides", "guides_text"),
+        ("start_style", "listing"),
+    ]
 
 
 def test_orchestrator_carries_compose_report_wiring():

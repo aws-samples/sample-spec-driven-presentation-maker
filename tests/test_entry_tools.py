@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from sdpm import tools
+from sdpm.knowledge.reference import GUIDE_RESULT_BUDGET
 
 _OUTLINE = """# Deck
 
@@ -85,21 +86,28 @@ class TestStartPresentation:
         for html_only in ("ECharts", "D3", "deck.css", "fragment", "preview/png", "slider"):
             assert html_only not in wf, html_only
 
-    def test_static_carries_the_deck_json_spec(self):
+    def test_the_deck_json_spec_is_handed_over_as_a_guide(self):
         from sdpm.config import REFERENCES_DIR
         from sdpm.knowledge.reference import read_docs
 
         r = tools.start_presentation()
-        assert set(r["static"]) == {"workflow", "deck_spec"}
-        spec = r["static"]["deck_spec"]
-        assert spec == read_docs(REFERENCES_DIR / "guides", ["deck-json-spec"])[0]["content"]
+        assert set(r["static"]) == {"workflow"}
+        assert "deck-json-spec" in r["must_read"]
+        spec = read_docs(REFERENCES_DIR / "guides", ["deck-json-spec"])[0]["content"]
+        assert spec.strip() in tools.read_guides(r["must_read"])["guides_text"]
         for field in ("template", "fonts", "defaultTextColor", "defaultBackground", "slideSize",
                       "outputFormat", "title", "language", "speakerNotes", "autoSpacing"):
             assert f"`{field}`" in spec, field
 
+    def test_the_story_line_guide_is_mandatory_too(self):
+        r = tools.start_presentation()
+        assert r["must_read"] == ["deck-json-spec", "story-line"]
+        assert set(r["listing"]) == {"guides", "invalid"}
+        assert r["listing"]["invalid"] == []
+
     def test_slide_specs_point_to_the_deck_json_spec(self):
-        pptx_spec = tools.start_composing()["static"]["slide_spec"]
-        html_spec = tools.start_composing(mode="html")["static"]["slide_spec"]
+        pptx_spec = tools.read_guides(tools.start_composing()["must_read"])["guides_text"]
+        html_spec = tools.read_guides(tools.start_composing(mode="html")["must_read"])["guides_text"]
         assert "deck-json-spec" in pptx_spec and "deck-json-spec" in html_spec
         assert "speakerNotes" not in pptx_spec and '`"defaultBackground"`' not in pptx_spec
         assert "speakerNotes" not in html_spec
@@ -122,11 +130,13 @@ class TestInitDeckWorkspace:
 
 
 class TestStartComposing:
-    def test_static_only_without_deck(self):
+    def test_role_document_and_mandatory_names_without_deck(self):
         r = tools.start_composing()
-        assert set(r) == {"static"}
+        assert set(r) == {"static", "must_read", "listing"}
+        assert set(r["static"]) == {"workflow"}
         assert "# Composer" in r["static"]["workflow"]
-        assert "deck.json" in r["static"]["slide_spec"]
+        assert r["must_read"] == ["slide-json-spec", "verify"]
+        assert "deck.json" in tools.read_guides(r["must_read"])["guides_text"]
 
     @pytest.mark.parametrize("mode", ["pptx", "html"])
     def test_static_depends_only_on_mode(self, mode: str, request: pytest.FixtureRequest):
@@ -135,13 +145,14 @@ class TestStartComposing:
         assert with_deck["deck"]["specs_ok"] is True
         assert tools.start_composing(mode=mode)["static"] == with_deck["static"]
 
-    def test_static_differs_between_modes(self):
-        pptx = tools.start_composing()["static"]
-        html = tools.start_composing(mode="html")["static"]
-        assert pptx == tools.start_composing(mode="pptx")["static"]
-        assert pptx != html
-        assert "# Composer" in html["workflow"] and "html" in html["workflow"].lower()
-        assert "slide-html" in html["slide_spec"] or "data-layout" in html["slide_spec"]
+    def test_the_mode_decides_the_role_document_and_the_guides(self):
+        pptx = tools.start_composing()
+        html = tools.start_composing(mode="html")
+        assert pptx["static"] == tools.start_composing(mode="pptx")["static"]
+        assert pptx["static"] != html["static"]
+        assert "# Composer" in html["static"]["workflow"] and "html" in html["static"]["workflow"].lower()
+        assert pptx["must_read"] == ["slide-json-spec", "verify"]
+        assert html["must_read"] == ["slide-html-spec", "verify"]
 
     def test_invalid_mode_is_rejected(self, deck: Path):
         for args in ((), (str(deck), ["intro"])):
@@ -308,7 +319,7 @@ class TestStartTranslation:
     def test_payload(self, deck: Path):
         r = tools.start_translation(str(deck), "en")
         assert "# Translate" in r["static"]["workflow"]
-        assert "deck.json" in r["static"]["slide_spec"]
+        assert r["must_read"] == ["slide-json-spec"]
         d = r["deck"]
         assert d["slides_present"] == ["demo-1", "demo-2", "intro"]
         assert d["sibling"] == str(deck.with_name(deck.name + "-en"))
@@ -473,9 +484,7 @@ def test_apply_style_returns_a_line_numbered_toc(tmp_path: Path):
 # Size budget: the start_composing result reaches the composer inline
 # ---------------------------------------------------------------------------
 
-# Kiro CLI V3 moves a tool result of 30,000+ characters to a file and shows the model
-# only its ends; Claude Code caps MCP output too. 25,000 leaves room for larger groups.
-_RESULT_BUDGET = 25_000
+_RESULT_BUDGET = GUIDE_RESULT_BUDGET
 
 _BUDGET_OUTLINE = """# Deck
 
@@ -553,12 +562,67 @@ def test_every_slide_format_guide_fits_the_tool_result_budget():
              "visual-forms", "slide-html-spec", "slide-html-scripts"]
     for name in names:
         result = tools.read_guides([name])
-        assert result["documents"][0]["content"], name
+        assert result["guides_text"], name
         assert len(json.dumps(result, ensure_ascii=False)) <= _RESULT_BUDGET, name
-    spec = tools.start_composing()["static"]["slide_spec"]
+    spec = tools.read_guides(tools.start_composing()["must_read"])["guides_text"]
     assert all(name in spec for name in names[1:5])
 
 
 def test_start_presentation_fits_the_tool_result_budget():
     """The orchestrator's entry comes back inline too; the styles are list_styles' part."""
     assert len(json.dumps(tools.start_presentation(), ensure_ascii=False)) <= _RESULT_BUDGET
+
+
+# ---------------------------------------------------------------------------
+# The outline opens with why that structure was chosen (REQ-8)
+# ---------------------------------------------------------------------------
+
+_RATIONALE = """# Deck
+
+## Why this structure
+
+Conclusion-first: the audience approves budgets and has the context already, so the
+recommendation leads and the evidence follows. A narrative arc was the alternative; it
+would have spent three slides before the ask.
+
+## Intro
+- [intro] Why this matters
+  - body: One paragraph of context
+  - visual: A single statement
+  - evidence: brief Sources 1
+"""
+
+
+class TestOutlineRationale:
+    def test_the_orchestrator_is_told_to_open_the_outline_with_it(self):
+        from sdpm.config import REFERENCES_DIR
+
+        text = (REFERENCES_DIR / "workflows" / "orchestrator.md").read_text(encoding="utf-8")
+        assert "Open the file with why this structure" in text
+        assert "before the first `- [slug]` line" in text
+        assert "story-line" in text
+
+    def test_it_is_told_not_to_write_it_as_a_sub_item(self):
+        from sdpm.config import REFERENCES_DIR
+
+        text = (REFERENCES_DIR / "workflows" / "orchestrator.md").read_text(encoding="utf-8")
+        # _SUB_ITEM_RE would read an indented `- key: value` line as a slide's sub-item.
+        assert "never as an indented `- key: value` line" in text
+
+    def test_such_an_outline_still_passes_check_specs(self, deck: Path):
+        (deck / "specs" / "outline.md").write_text(_RATIONALE, encoding="utf-8")
+        result = tools.check_specs(str(deck), ["intro"])
+        assert result["ok"] is True, result
+
+    def test_the_slug_list_is_unchanged_by_the_prose(self, deck: Path):
+        before = tools.check_specs(str(deck))["slugs"]
+        (deck / "specs" / "outline.md").write_text(_RATIONALE, encoding="utf-8")
+        after = tools.check_specs(str(deck))["slugs"]
+        assert after == ["intro"]
+        assert before[0] == "intro"
+
+    def test_a_composer_reads_the_outline_whole(self, deck: Path):
+        (deck / "specs" / "outline.md").write_text(_RATIONALE, encoding="utf-8")
+        payload = tools.start_composing(str(deck), ["intro"])
+        assert payload["deck"]["specs_ok"] is True
+        assert "Why this structure" in payload["deck"]["outline"]

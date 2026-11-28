@@ -6,6 +6,7 @@ Reference data is used to guide AI-generated slide content.
 See docs/internal/DATASET_COMPLIANCE.md for dataset provenance.
 
 Reference: unified access to design patterns, components, schemas, rules, and reviews."""
+import json
 import re
 from collections.abc import Iterable
 from pathlib import Path, PureWindowsPath
@@ -16,6 +17,9 @@ from sdpm.knowledge.reference.providers import FileProvider, ReferenceProvider  
 
 # Package-bundled styles directory (for user-local style search fallback).
 BUNDLED_STYLES_DIR = REFERENCES_DIR / "examples" / "styles"
+
+# Package-bundled guides directory: the guide collection's last source.
+BUNDLED_GUIDES_DIR = REFERENCES_DIR / "guides"
 
 _HTML_TITLE_RE = re.compile(r"<title>(.*?)</title>", re.IGNORECASE)
 
@@ -187,6 +191,385 @@ def _strip_frontmatter(text: str) -> str:
             if line.strip() == "---":
                 return "".join(lines[i + 1:]).lstrip("\n")
     return text
+
+
+# ---------------------------------------------------------------------------
+# Guides: one collection, classified by role tags
+# ---------------------------------------------------------------------------
+
+#: Every role tag a guide may carry, and the whole vocabulary. Closed on purpose: a tag
+#: outside it is reported as invalid metadata instead of silently matching nothing.
+TAGS = (
+    "orchestrator",
+    "composer",
+    "composer-pptx",
+    "composer-html",
+    "style",
+    "translate",
+    "management",
+)
+
+#: Cap on one ``read_guides`` result. Kiro CLI V3 moves a tool result of 30,000+
+#: characters to a file and shows the model only its ends; Claude Code caps MCP output
+#: too. 25,000 leaves room for a larger group. ``tests/test_entry_tools.py`` measures
+#: every surface's entry payload against this same number.
+GUIDE_RESULT_BUDGET = 25_000
+
+#: Cap on one guide's text, derived from the budget rather than chosen: a guide nobody
+#: can read in one call would be reported as valid and then arrive truncated. The 1,000
+#: covers the JSON framing and the heading (measured: 513 for the largest bundled guide).
+#: UTF-8 bytes are never fewer than characters, so a byte cap bounds the character count.
+#: The largest bundled guide is 22,375 bytes.
+GUIDE_MAX_BYTES = GUIDE_RESULT_BUDGET - 1_000
+
+#: Cap on one guide's description and on a guide name. Every description rides in every
+#: listing, and a listing rides in every ``start_*`` return, so an unbounded description
+#: inflates that payload as surely as a body would. The longest bundled one is 193.
+GUIDE_DESCRIPTION_MAX = 400
+GUIDE_NAME_MAX = 100
+
+_GUIDE_KEYS = ("description", "tags", "always")
+_FM_KEY_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_-]*):(.*)$")
+
+
+def is_guide_name(name: Any) -> bool:
+    """Whether ``name`` names one guide.
+
+    Stricter than :func:`is_style_name`, which deliberately admits ``acme.v2``: a guide
+    name is also a key in ``start_*``'s ``guides`` map, so it carries no ``.`` at all.
+    Pure — a bad name is rejected before it ever becomes a path or an S3 key.
+    """
+    return (
+        isinstance(name, str)
+        and name.strip() == name != ""
+        and len(name) <= GUIDE_NAME_MAX
+        and "." not in name
+        and not any(ord(ch) < 32 or ord(ch) == 127 for ch in name)
+        and PureWindowsPath(name).name == name  # Windows rules also catch "/" and "C:"
+    )
+
+
+def _parse_frontmatter(text: str) -> tuple[dict[str, Any], str] | str:
+    """Split a guide into its frontmatter entries and its body, or name the failure.
+
+    Returns ``({key: value}, body)``, where a block sequence arrives as ``list[str]``
+    and everything else as the raw scalar, so the per-key checks stay in one place.
+    Returns the string ``"frontmatter"`` when the block itself is outside the grammar:
+    missing, unterminated, commented, indented, duplicated, or carrying a null value.
+
+    A blank line inside the block is allowed and carries nothing; it is the one form
+    the grammar neither spells out nor excludes, and rejecting it would only produce a
+    confusing diagnostic for a harmless authoring habit.
+    """
+    lines = text.splitlines()
+    if not lines or lines[0].strip() != "---":
+        return "frontmatter"
+    close = next((i for i, line in enumerate(lines[1:], 1) if line.strip() == "---"), None)
+    if close is None:
+        return "frontmatter"
+
+    entries: dict[str, Any] = {}
+    sequence: list[str] | None = None
+    for raw in lines[1:close]:
+        if not raw.strip():
+            continue
+        if raw.lstrip().startswith("- "):
+            if sequence is None:
+                return "frontmatter"
+            sequence.append(raw.lstrip()[2:].strip().strip('"'))
+            continue
+        if raw != raw.lstrip():
+            return "frontmatter"  # indented and not a sequence item: nested map or folded scalar
+        match = _FM_KEY_RE.match(raw)
+        if match is None:
+            return "frontmatter"  # a comment, a bare word, anything that is not `key: value`
+        key, value = match.group(1), match.group(2).strip()
+        if key in entries:
+            return "frontmatter"  # duplicate key
+        if value:
+            sequence = None
+            entries[key] = value
+        elif key == "tags":
+            sequence = []
+            entries[key] = sequence
+        else:
+            return "frontmatter"  # a null value
+    return entries, _strip_frontmatter(text)
+
+
+def _parse_tags(raw: Any) -> list[str] | None:
+    """Tag values from a flow or block sequence, or ``None`` when the value is neither."""
+    if isinstance(raw, list):
+        return raw
+    if raw.startswith("[") and raw.endswith("]"):
+        inner = raw[1:-1].strip()
+        return [item.strip().strip('"') for item in inner.split(",")] if inner else []
+    return None
+
+
+def guide_meta(name: str, text: str) -> dict[str, Any]:
+    """One guide's metadata, or the category under which it is invalid.
+
+    Returns ``{"name", "description", "tags", "always", "body"}`` for a valid guide, and
+    ``{"name", "category"}`` for an invalid one, naming the first failed check in this
+    order: ``name``, ``frontmatter``, ``unknown-key``, ``description``, ``tags``,
+    ``tag-value``, ``always``, ``size``. A guide breaking several is reported once, so a
+    caller gets one actionable cause rather than a list.
+
+    ``body`` is the frontmatter-stripped text, so this one parse serves both the listing
+    and the automatic hand-over and the two cannot disagree about what the text is.
+
+    Takes the text, not a path: the remote passes an S3 body and the local a file read.
+    """
+    def invalid(category: str) -> dict[str, Any]:
+        return {"name": name, "category": category}
+
+    if not is_guide_name(name):
+        return invalid("name")
+
+    parsed = _parse_frontmatter(text)
+    if isinstance(parsed, str):
+        return invalid(parsed)
+    entries, body = parsed
+
+    if any(key not in _GUIDE_KEYS for key in entries):
+        return invalid("unknown-key")
+
+    description = entries.get("description")
+    if not isinstance(description, str) or not description.strip('"').strip():
+        return invalid("description")
+    if len(description.strip('"').strip()) > GUIDE_DESCRIPTION_MAX:
+        return invalid("description")
+
+    raw_tags = entries.get("tags")
+    if raw_tags is None:
+        return invalid("tags")
+    tags = _parse_tags(raw_tags)
+    if not tags:
+        return invalid("tags")
+    if any(tag not in TAGS for tag in tags):
+        return invalid("tag-value")
+
+    always = entries.get("always", "false")
+    if always not in ("true", "false"):
+        return invalid("always")
+
+    if len(text.encode("utf-8")) > GUIDE_MAX_BYTES:
+        return invalid("size")
+
+    return {
+        "name": name,
+        "description": description.strip('"').strip(),
+        "tags": tags,
+        "always": always == "true",
+        "body": body,
+    }
+
+
+def build_collection(sources: list[tuple[str, list[dict[str, str]]]]) -> dict[str, Any]:
+    """Merge labelled guide groups into the one collection every guide surface reads.
+
+    Each group is ``(source, entries)`` — ``source`` being ``"user"`` or ``"builtin"``,
+    each entry ``{"name", "location", "text"}``. Pass the user's group first: the first
+    valid entry of each name wins, so a user guide shadows the bundled guide of that name
+    for listing, read-by-name and automatic hand-over alike.
+
+    Returns ``{"valid": {name: meta}, "invalid": [{"path", "category"}], "warnings":
+    [{"name", "warning"}]}``. An invalid entry never wins a name — resolution continues to
+    the next source — and never fails the call: the valid guides beside it are still
+    listed, read and handed over.
+
+    An entry whose name a previous group already won is parsed only to compare: shadowing
+    is the one way to make a role lose a guide it was handed automatically, and a reader
+    who takes a bundled name without its ``always`` or its tags gets no error anywhere
+    else. What the shadowed guide no longer gives any role becomes a warning. Its own
+    metadata is not reported otherwise, and a shadowed entry that is itself invalid is
+    passed over: nothing can be said about what it would have given.
+
+    Pure function. The caller supplies the groups, which is what lets the remote merge S3
+    bodies and the local merge file reads through this same rule.
+    """
+    valid: dict[str, dict[str, Any]] = {}
+    invalid: list[dict[str, str]] = []
+    warnings: list[dict[str, str]] = []
+    for source, entries in sources:
+        for entry in entries:
+            name = entry["name"]
+            if name in valid:
+                lost = _shadowing_loss(valid[name], guide_meta(name, entry["text"]), source)
+                if lost:
+                    warnings.append({"name": name, "warning": lost})
+                continue
+            meta = guide_meta(name, entry["text"])
+            if "category" in meta:
+                invalid.append({"path": entry["location"], "category": meta["category"]})
+                continue
+            valid[name] = {**meta, "source": source}
+    return {"valid": valid, "invalid": invalid, "warnings": warnings}
+
+
+def _shadowing_loss(winner: dict[str, Any], shadowed: dict[str, Any], shadowed_source: str) -> str:
+    """What no role gets any more because ``winner`` took ``shadowed``'s name, or "".
+
+    Only a loss is worth a warning. Taking the name of a guide to say the same thing
+    differently is the point of shadowing; dropping its ``always`` or one of its tags is
+    not, because the role that was handed it keeps asking and no longer receives it.
+    """
+    if "category" in shadowed:
+        return ""
+    losses = []
+    if shadowed["always"] and not winner["always"]:
+        losses.append("it was handed over automatically and yours is not (no always: true)")
+    missing = [tag for tag in shadowed["tags"] if tag not in winner["tags"]]
+    if missing:
+        losses.append(f"it was tagged {', '.join(missing)} and yours is not")
+    if not losses:
+        return ""
+    return f"shadows the {shadowed_source} guide of this name, but " + "; ".join(losses)
+
+
+#: What a listing shows about a guide. The body is deliberately absent: the listing rides
+#: inside every ``start_*`` return, so carrying 31 bodies there would duplicate the prompt.
+_LISTING_FIELDS = ("name", "description", "source", "tags", "always")
+
+
+def _selected(collection: dict[str, Any], tags: set[str]) -> list[dict[str, Any]]:
+    """Entries whose tags intersect ``tags``, by name. An empty set selects everything."""
+    return [
+        meta
+        for name, meta in sorted(collection["valid"].items())
+        if not tags or set(meta["tags"]) & tags
+    ]
+
+
+def select_guides(collection: dict[str, Any], tags: set[str]) -> list[dict[str, Any]]:
+    """What a caller carrying ``tags`` can see, in ascending name order.
+
+    A guide is selected when its tags intersect the call's tag set, so a guide tagged for
+    one composer mode only still appears in that mode's listing. An empty set — a listing
+    request with no role — selects every guide.
+    """
+    return [{key: meta[key] for key in _LISTING_FIELDS} for meta in _selected(collection, tags)]
+
+
+def always_guides(collection: dict[str, Any], tags: set[str]) -> dict[str, str]:
+    """``name -> body`` for the selected guides a caller carrying ``tags`` is handed.
+
+    The same selection as :func:`select_guides`, narrowed to the guides whose frontmatter
+    claims ``always``. That claim applies to every tag the guide carries; there is no
+    per-tag variant. Ascending name order, so the map and its joined form agree.
+    """
+    return {
+        meta["name"]: meta["body"]
+        for meta in _selected(collection, tags)
+        if meta["always"]
+    }
+
+
+def guides_by_name(collection: dict[str, Any], names: Iterable[str]) -> dict[str, str]:
+    """``name -> body`` for each requested guide.
+
+    The only way to address a guide: a caller passes back the identifier a listing showed
+    or a ``start_*`` named as mandatory. A user's guide resolves here exactly as a bundled
+    one does, so shadowing holds for reading as well as for listing.
+
+    Raises ``FileNotFoundError`` naming what the collection does hold — the same failure
+    the bundled reader gives, with the merged names instead of one directory's.
+    """
+    valid = collection["valid"]
+    bodies: dict[str, str] = {}
+    for name in names:
+        if name not in valid:
+            available = ", ".join(sorted(valid))
+            raise FileNotFoundError(f"'{name}' is not a guide. Available: {available}")
+        bodies[name] = valid[name]["body"]
+    return bodies
+
+
+def guides_listing(collection: dict[str, Any], role: str = "") -> dict[str, Any]:
+    """The ``list_guides`` payload: what a role can see, or everything when ``role`` is "".
+
+    An unknown role is an error rather than an empty list: a typo that silently returned
+    nothing would read as "this role has no guides".
+    """
+    if role and role not in TAGS:
+        return {"error": f"role must be one of {list(TAGS)}, got '{role}'"}
+    payload: dict[str, Any] = {
+        "guides": select_guides(collection, {role} if role else set()),
+        "role": role,
+    }
+    if collection["invalid"]:
+        payload["invalid"] = collection["invalid"]
+    if collection.get("warnings"):
+        payload["warnings"] = collection["warnings"]
+    return payload
+
+
+def join_guides(guides: dict[str, str]) -> str:
+    """One text carrying every handed-over guide, titled and in ascending name order.
+
+    Byte-identical for equal input: the order is the sorted names and each body is
+    normalised to one trailing newline, so a prompt built from it is reproducible.
+    """
+    return "\n".join(f"# Guide: {name}\n\n{guides[name].rstrip()}\n" for name in sorted(guides))
+
+
+def _spec_first(collection: dict[str, Any], name: str) -> tuple[bool, str]:
+    """Sort key putting the guides a role cannot work without at the front.
+
+    A bundled guide claiming ``always`` is the format spec and the checks — a composer
+    that loses ``slide-json-spec`` cannot produce a valid slide at all, while a guide of
+    the user's own carries a preference. So when a result has to shed something, this
+    order decides what, and the spec is never what goes.
+    """
+    meta = collection["valid"][name]
+    return (not (meta["always"] and meta["source"] != "user"), name)
+
+
+def guides_result(
+    collection: dict[str, Any],
+    names: Iterable[str],
+    budget: int = GUIDE_RESULT_BUDGET,
+) -> dict[str, Any]:
+    """The ``read_guides`` payload: the guides that fit one result, and what did not.
+
+    A result past the budget is filed away by the client, which hands the model the ends
+    of a guide it was told to read and says nothing. So the result is filled to the budget
+    instead, in :func:`_spec_first` order, and whatever did not fit is named. A caller
+    that can see what it is missing can act; a silently truncated one cannot.
+
+    What was left out is said **twice**: under ``not_included`` for a caller reading the
+    keys, and at the end of ``guides_text`` itself. A surface that composes a system prompt
+    keeps only the text (``agent/modes`` picks ``guides_text``), so a note living only in a
+    key would reach that model as nothing at all — the same silence this function exists to
+    end. Carrying it in the text means it travels wherever the text does.
+
+    ``GUIDE_MAX_BYTES`` is derived from this budget, so one guide always fits and the
+    fill never returns nothing. A guide whose JSON escaping alone crosses the budget is
+    still returned, with the note naming it — being told is better than being cut.
+
+    Every guide surface routes its read through here, so one rule covers the local tools,
+    the CLI and the remote server rather than three.
+    """
+    bodies = guides_by_name(collection, names)
+    ordered = sorted(bodies, key=lambda name: _spec_first(collection, name))
+    kept = list(ordered)
+    while True:
+        text = join_guides({name: bodies[name] for name in kept})
+        left = ordered[len(kept):]
+        payload: dict[str, Any] = {}
+        if left:
+            note = (
+                f"{len(left)} guide(s) did not fit this result's {budget:,}-character budget: "
+                f"{', '.join(left)}. Call read_guides again with those names to read them."
+            )
+            payload = {"guides_text": f"{text}\n# Not included\n\n{note}\n",
+                       "not_included": left, "note": note}
+        else:
+            payload = {"guides_text": text}
+        if len(kept) <= 1 or len(json.dumps(payload, ensure_ascii=False)) <= budget:
+            return payload
+        kept.pop()
 
 
 def list_category(category_dir: Path) -> list[dict[str, str]]:

@@ -11,8 +11,8 @@ cs = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(cs)
 
 ORCH = cs.payload_id("start_presentation", {}, "static.workflow")
-SPEC_PPTX = cs.payload_id("start_composing", {"mode": "pptx"}, "static.slide_spec")
-SPEC_TRANSLATE = cs.payload_id("start_translation", {"language": "ja"}, "static.slide_spec")
+SPEC_PPTX = cs.mandatory_id("composer-pptx")
+SPEC_TRANSLATE = cs.mandatory_id("translate")
 
 
 def _collected() -> dict:

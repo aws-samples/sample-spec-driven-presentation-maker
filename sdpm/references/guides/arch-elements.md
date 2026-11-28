@@ -1,5 +1,6 @@
 ---
 description: "Architecture diagram components (groups, arrows, icons, scale) — read when slide contains system/architecture diagram"
+tags: [composer]
 ---
 
 Common components for architecture diagrams (borders, groups, arrows, scale, colors).

@@ -1,7 +1,6 @@
 ---
-name: slide-json-effects
 description: "Slide JSON effects — shadow, glow, softEdge, reflection, bevel and rotation3d on shapes, textboxes and images"
-category: guide
+tags: [composer-pptx]
 ---
 
 # Slide JSON Effects

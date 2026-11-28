@@ -1,7 +1,6 @@
 ---
-name: attachments
 description: "read_attachment / import_attachment — formats, paging, the import bundle layout, and retry"
-category: guide
+tags: [orchestrator]
 ---
 
 # Attachments

@@ -72,11 +72,31 @@ _STYLE_TOOLS = [
     "run_style_python", "list_styles", "analyze_template", "read_attachment",
 ]
 
-# The deck.json field reference start_presentation returns with the role document:
-# deck-independent, so it sits before the cache point and is cached with it.
-_DECK_SPEC = Part(
-    Source.mcp("start_presentation", {}, pick="static.deck_spec"), target="system", label="deck-json-spec",
-)
+def _guides(tool: str, args: dict | None = None) -> list[Part]:
+    """The guides this role must read, and the listing of every guide it can see.
+
+    The text comes from ``read_guides``, called with the names the role's own entry tool
+    reported as mandatory. No guide is named here: which ones a role must read depends on
+    the collection, and a user extends that collection.
+
+    This surface has no 30,000-character tool-result limit, so it takes the bodies up front
+    rather than leaving the model to ask. An interactive client reads ``must_read`` and
+    calls ``read_guides`` itself; the role documents say so.
+
+    Picked from the top level rather than from ``static``: ``_process_cache_key`` shares
+    anything under ``static.`` across every user, and a user's own guide must never reach
+    another user's prompt. Both parts sit inside the cached prefix — identical for every
+    user who has not written a guide of their own, and a user who has genuinely has a
+    different prompt.
+    """
+    args = args or {}
+    return [
+        Part(
+            Source.mcp("read_guides", {"names": Source.mcp(tool, args, pick="must_read")}, pick="guides_text"),
+            target="system", label="guides",
+        ),
+        Part(Source.mcp(tool, args, pick="listing"), target="system", label="guides-listing"),
+    ]
 
 _INTERACTION_DIALOGUE = Part(Source.file("wiring/interaction_dialogue"), target="system")
 _INTERACTION_FAST = Part(Source.file("wiring/interaction_fast"), target="system")
@@ -88,7 +108,7 @@ def _orchestrator(*wiring: Part, use_composer: bool = True, **overrides) -> Mode
         parts=[
             _COMMON_LANGUAGE,
             _role("start_presentation"),
-            _DECK_SPEC,
+            *_guides("start_presentation"),
             *wiring,
             _COMMON_ATTACHMENTS,
             *([_WIRING_COMPOSE_REPORT] if use_composer else []),
@@ -107,30 +127,28 @@ _ORCHESTRATOR = _orchestrator()
 _ORCHESTRATOR_DIALOGUE = _orchestrator(_INTERACTION_DIALOGUE)
 _ORCHESTRATOR_FAST = _orchestrator(_INTERACTION_FAST)
 
-# Composer: the whole static part of start_composing (role document + slide
-# spec) is system and cached across groups and repeat composes; the per-deck
-# part is replayed per group by compose_slides as a start_composing tool result.
+# Composer: the role document and the mode's guides are system and cached across
+# groups and repeat composes; the per-deck part is replayed per group by compose_slides
+# as a start_composing tool result.
 _COMPOSER = ModeConfig(
     parts=[
         Part(Source.mcp("start_composing", {}, pick="static.workflow"), target="system", label="workflow:composer"),
-        Part(Source.mcp("start_composing", {}, pick="static.slide_spec"), target="system", label="slide-json-spec"),
+        *_guides("start_composing"),
     ],
     use_composer=False,
     allowed_tools=_DECK_TOOLS,
 )
 
-# HTML composer: the html mode of the same entry tool (composer-html workflow +
-# slide HTML spec). compose_slides picks it for decks with outputFormat html.
+# HTML composer: the html mode of the same entry tool. Its tag set picks up
+# slide-html-spec where the pptx mode picks up slide-json-spec. compose_slides chooses
+# this mode for decks with outputFormat html.
 _HTML_COMPOSER = ModeConfig(
     parts=[
         Part(
             Source.mcp("start_composing", {"mode": "html"}, pick="static.workflow"),
             target="system", label="workflow:composer-html",
         ),
-        Part(
-            Source.mcp("start_composing", {"mode": "html"}, pick="static.slide_spec"),
-            target="system", label="slide-html-spec",
-        ),
+        *_guides("start_composing", {"mode": "html"}),
     ],
     use_composer=False,
     allowed_tools=_DECK_TOOLS,
@@ -140,6 +158,7 @@ _STYLE_CREATOR = ModeConfig(
     parts=[
         _COMMON_LANGUAGE,
         _role("start_style"),
+        *_guides("start_style"),
         Part(Source.file("wiring/style_remote"), target="system"),
         _NOW,
     ],

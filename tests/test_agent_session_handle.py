@@ -64,7 +64,13 @@ class _PM:
 
     def call_tool_sync(self, tool_use_id, name, arguments, **kwargs):
         self.state["calls"].append((self.token.token if self.token else "", name))
-        payload = {"static": {"workflow": "# Orchestrator", "deck_spec": "# deck.json"}, "styles": [], "templates": []}
+        payload = {
+            "static": {"workflow": "# Orchestrator"},
+            "must_read": ["deck-json-spec"],
+            "guides_text": "# Guide: deck-json-spec\n\n# deck.json\n",
+            "listing": {"guides": [], "invalid": []},
+            "styles": [], "templates": [],
+        }
         return {"status": "success", "content": [{"text": json.dumps(payload)}]}
 
 
@@ -200,7 +206,7 @@ def test_the_second_turn_reuses_the_clients_and_the_agent(env):
     assert second is first
     (pm,) = env["pm"]
     assert pm.connects == 1
-    assert [c[1] for c in env["calls"]] == ["start_presentation"]
+    assert [c[1] for c in env["calls"]] == ["start_presentation", "read_guides"]
     assert len(env["managers"]) == 1
     assert status[0] == {"name": "Presentation Maker", "status": "ok"}
 
@@ -295,7 +301,7 @@ def test_prepare_builds_no_session_manager_and_the_first_prompt_one(env):
     assert env["managers"] == []
     (pm,) = env["pm"]
     assert pm.connects == 1
-    assert [c[1] for c in env["calls"]] == ["start_presentation"]
+    assert [c[1] for c in env["calls"]] == ["start_presentation", "read_guides"]
     assert handle.prepare(_jwt("user-1")).result(5) == status, "idempotent"
 
     agent, _ = handle.begin_turn(_jwt("user-1"))
@@ -303,7 +309,7 @@ def test_prepare_builds_no_session_manager_and_the_first_prompt_one(env):
     assert len(env["managers"]) == 1
     assert agent.kwargs["session_manager"] is env["managers"][0][0]
     assert pm.connects == 1
-    assert [c[1] for c in env["calls"]] == ["start_presentation"]
+    assert [c[1] for c in env["calls"]] == ["start_presentation", "read_guides"]
 
 
 def test_a_stopped_turn_leaves_the_handle_reusable(env):

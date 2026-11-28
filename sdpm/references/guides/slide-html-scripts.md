@@ -1,7 +1,6 @@
 ---
-name: slide-html-scripts
 description: "Slide scripts in HTML decks — how a slide's <script> runs, the bundled ECharts / D3, per-visit hooks, print view, sizes and colours"
-category: guide
+tags: [composer-html]
 ---
 
 # Slide HTML Scripts

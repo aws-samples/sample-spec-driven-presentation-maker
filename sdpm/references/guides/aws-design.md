@@ -1,5 +1,6 @@
 ---
 description: "AWS-specific design conventions — read when building AWS service content"
+tags: [composer]
 ---
 
 # AWS Design Guide

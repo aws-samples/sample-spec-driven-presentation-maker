@@ -1,7 +1,6 @@
 ---
-name: hand-edit-sync
 description: "Phase 4: Sync after hand-editing (only when requested)"
-category: workflow
+tags: [orchestrator, management]
 ---
 
 # Phase 4: Sync After Hand-Editing

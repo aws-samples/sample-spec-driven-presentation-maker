@@ -388,7 +388,8 @@ To add custom roles (e.g., team-based access), modify the `resolve_role` functio
 | Sandbox | `run_python`, `run_style_python` | Run Python against the deck workspace in a local process (edits, measuring, previews returned as `preview_files`); the style variant for the style workflow |
 | Assets | `search_assets`, `list_templates` | Search icons (empty query = discovery), list templates |
 | References | `list_styles` | Bundled and user styles. For a client that declares MCP Apps, the result shows as a style gallery in the chat; the user's pick comes back as their message |
-| References | `read_guides` | Design rules, guides, and the slide JSON spec (`slide-json-spec`) |
+| References | `list_guides` | Which guides exist for a role, what each decides, and which ones that role must read. Bundled and user guides in one list, with any invalid entry named |
+| References | `read_guides` | Guides by name, as one text. Design rules, the slide JSON spec (`slide-json-spec`), and anything the user added. Fills to the result budget and names what did not fit |
 | Layout | `grid`, `arch_diagram` | CSS Grid coordinate calculation; architecture diagram layout |
 | Utility | `code_to_slide` | Code highlighting |
 

@@ -1,5 +1,6 @@
 ---
 description: "Visual design principles (color, typography, effects, layout) — read during art direction phase"
+tags: [composer]
 ---
 
 # Design Rules

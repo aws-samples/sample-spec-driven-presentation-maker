@@ -259,10 +259,11 @@ def test_start_composing_html_materializes_html_slides_and_template(server, cach
     assert any(k.startswith(TEMPLATE_CACHE_PREFIX) and k.endswith("/template.json") for k in server._storage.objects)
 
 
-def test_start_composing_without_deck_returns_html_static(server):
+def test_start_composing_without_deck_returns_the_html_role_and_its_names(server):
     payload = json.loads(server.start_composing(mode="html"))
-    assert set(payload) == {"static"}
+    assert set(payload) == {"static", "must_read", "listing"}
     assert payload["static"]["workflow"].startswith("# Composer (HTML)")
+    assert payload["must_read"] == ["slide-html-spec", "verify"]
 
 
 def test_start_composing_mode_mismatch_reports_deck_format(server):
@@ -845,12 +846,13 @@ def test_prepare_rejects_refs_outside_the_deck(tmp_path, cache_root):
 # --- tool count --------------------------------------------------------------------
 
 
-def test_remote_tool_count_unchanged():
-    """20 tools as before; a configured knowledge base adds only search_slides."""
+def test_remote_tool_count_matches_the_local_surface():
+    """21 tools, the same set the local surface exposes; a knowledge base adds search_slides."""
     import asyncio
 
     without_kb = {t.name for t in asyncio.run(remote_server.mcp.list_tools())}
-    assert len(without_kb) == 20 and "search_slides" not in without_kb
+    assert len(without_kb) == 21 and "search_slides" not in without_kb
+    assert {"list_guides", "read_guides"} <= without_kb
 
     env = {
         "DECKS_TABLE": "decks-test", "PPTX_BUCKET": "pptx-test", "RESOURCE_BUCKET": "resource-test",

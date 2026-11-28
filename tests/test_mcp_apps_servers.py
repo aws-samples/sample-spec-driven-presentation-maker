@@ -158,8 +158,9 @@ def test_a_client_without_mcp_apps_sees_no_app_tool(server) -> None:
     assert _listed(server, {"io.example/other": {}}).keys() == listed.keys()
 
 
-def test_the_local_server_lists_twenty_tools(local) -> None:
-    assert len(_listed(local)) == 20
+def test_the_local_server_lists_twenty_one_tools(local) -> None:
+    # 20, plus list_guides: nothing enumerated the guides before it.
+    assert len(_listed(local)) == 21
 
 
 @pytest.mark.parametrize(("which", "declaration"), [

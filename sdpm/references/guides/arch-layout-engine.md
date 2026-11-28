@@ -1,5 +1,6 @@
 ---
 description: "Nested-JSON architecture layout engine (auto-routing) — read when building an AWS/system architecture diagram from logical structure instead of hand-placing coordinates"
+tags: [composer]
 ---
 
 # Architecture Layout Engine (nested-JSON auto-router)

@@ -393,21 +393,37 @@ def cmd_start(args):
         print(json.dumps(payload, ensure_ascii=False, indent=2))
 
 
+def cmd_list_guides(args):
+    """Which guides exist, from the same collection the MCP tools read."""
+    from sdpm.entry import guide_collection
+    from sdpm.knowledge.reference import guides_listing
+    listing = guides_listing(guide_collection(), getattr(args, "role", "") or "")
+    if "error" in listing:
+        print(f"# {listing['error']}", file=sys.stderr)
+        return
+    print("# Guides" + (f" ({listing['role']})" if listing["role"] else ""))
+    for item in listing["guides"]:
+        mark = "*" if item["always"] else " "  # * = this role must read it
+        print(f"{mark} {item['name']:<36} [{','.join(item['tags'])}] {item['description']}")
+    for bad in listing.get("invalid", []):
+        print(f"# invalid ({bad['category']}): {bad['path']}", file=sys.stderr)
+
+
 def cmd_guides(args):
-    """List or show guide documents."""
-    from sdpm.knowledge.reference import list_category, read_docs
-    d = Path(__file__).parent.parent / "references" / "guides"
+    """Show guides by name, from the same collection the MCP tools read."""
+    from sdpm.entry import guide_collection
+    from sdpm.knowledge.reference import guides_result
     if not args.names:
-        print("# Guides")
-        for item in list_category(d):
-            print(f"  {item['name']:<36} {item['description']}")
-    else:
-        try:
-            for doc in read_docs(d, args.names):
-                print(doc["content"])
-                print()
-        except FileNotFoundError as e:
-            print(f"# {e}", file=sys.stderr)
+        cmd_list_guides(args)
+        return
+    try:
+        result = guides_result(guide_collection(), args.names)
+    except FileNotFoundError as e:
+        print(f"# {e}", file=sys.stderr)
+        return
+    print(result["guides_text"])
+    if "not_included" in result:
+        print(f"\n# {result['note']} Not included: {', '.join(result['not_included'])}", file=sys.stderr)
 
 
 def cmd_init(args):
@@ -709,7 +725,10 @@ def main():
                          help="Composer mode: pptx (slide JSON) or html (slide HTML) (composing)")
     p_start.add_argument("--workflow-only", action="store_true", help="Print only the role document")
 
-    p_gd = subparsers.add_parser("read_guides", help="List or show guide documents")
+    p_lg = subparsers.add_parser("list_guides", help="Which guides exist, what each decides, which are mandatory")
+    p_lg.add_argument("role", nargs="?", default="", help="Role tag to filter by (empty: every guide)")
+
+    p_gd = subparsers.add_parser("read_guides", help="Show guide documents by name")
     p_gd.add_argument("names", nargs="*", help="Guide names to show (multiple allowed)")
 
     p_init = subparsers.add_parser("init_deck_workspace", help="Create an empty deck workspace (deck.json, slides/, specs/)")
@@ -778,6 +797,8 @@ def main():
         cmd_list_styles(args)
     elif args.command == "start":
         cmd_start(args)
+    elif args.command == "list_guides":
+        cmd_list_guides(args)
     elif args.command == "read_guides":
         cmd_guides(args)
     elif args.command == "init_deck_workspace":

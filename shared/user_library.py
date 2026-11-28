@@ -16,6 +16,7 @@ description and the user-over-bundled shadowing — come from the engine
 S3 layout:
   pptx bucket      user-styles/{user_id}/{name}.html
                    user-templates/{user_id}/{name}.pptx
+                   user-guides/{user_id}/{name}.md
   resource bucket  references/examples/styles/{name}.html  (bundled styles)
                    templates/{name}.pptx                    (builtin templates)
                    assets/{source}/{file}                   (icon catalog)
@@ -139,6 +140,46 @@ def merge_styles(user_styles: list[dict], builtin_styles: list[dict]) -> list[di
     from sdpm.knowledge.reference import merge_style_lists
 
     return merge_style_lists(user_styles, builtin_styles)
+
+
+# ---------------------------------------------------------------------------
+# Guides
+# ---------------------------------------------------------------------------
+
+
+def user_guides_prefix(user_id: str) -> str:
+    """S3 prefix of the user's guides in the pptx bucket."""
+    return f"user-guides/{user_id}/"
+
+
+def user_guide_key(user_id: str, name: str) -> str:
+    """S3 key of a user guide in the pptx bucket."""
+    return f"{user_guides_prefix(user_id)}{name}.md"
+
+
+def list_user_guides(s3: Any, pptx_bucket: str, user_id: str) -> list[dict]:
+    """The user's guides in the pptx bucket, as collection source entries, sorted by name.
+
+    Returns ``[{name, location, text}]`` — what
+    :func:`sdpm.knowledge.reference.build_collection` merges. The raw text always comes
+    back, because a guide's description and tags live in its own frontmatter: unlike a
+    style, there is nothing to list without reading it.
+
+    An object whose body cannot be read comes back with empty text, so the merge reports
+    it as invalid against its key rather than dropping it from the listing. A guide that
+    vanishes silently is the failure this collection is built to avoid.
+    """
+    prefix = user_guides_prefix(user_id)
+    entries: list[dict] = []
+    for key in _list_keys(s3, pptx_bucket, prefix):
+        if not key.endswith(".md"):
+            continue
+        try:
+            text = s3.get_object(Bucket=pptx_bucket, Key=key)["Body"].read().decode("utf-8")
+        except Exception:  # noqa: BLE001 — reported through the collection's invalid list
+            text = ""
+        entries.append({"name": key.removeprefix(prefix).removesuffix(".md"), "location": key, "text": text})
+    return entries
 
 
 # ---------------------------------------------------------------------------

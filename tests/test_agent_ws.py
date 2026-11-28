@@ -419,7 +419,7 @@ def test_prepare_builds_the_handle_without_memory_or_healthy_busy(ctx, real_hand
     assert next(c for c in client.ctl if c["ctl"] == "ready")["mcp_status"][0]["status"] == "ok"
     records = recorder.read()
     assert [r["name"] for r in records if r["kind"] == "client"] == ["created"]
-    assert [r["name"] for r in records if r["kind"] == "mcp"] == ["start_presentation"]
+    assert [r["name"] for r in records if r["kind"] == "mcp"] == ["start_presentation", "read_guides"]
     assert not [r for r in records if r["kind"] == "memory"]
     assert managers == [] and ctx.busy.started == []
     session = ctx.registry.get(OWNED, "user-1")
@@ -430,7 +430,7 @@ def test_prepare_builds_the_handle_without_memory_or_healthy_busy(ctx, real_hand
 
     records = recorder.read()
     assert [r["name"] for r in records if r["kind"] == "client"] == ["created"], "the prompt reused the handle"
-    assert [r["name"] for r in records if r["kind"] == "mcp"] == ["start_presentation"]
+    assert [r["name"] for r in records if r["kind"] == "mcp"] == ["start_presentation", "read_guides"]
     assert len(managers) == 1
     assert [r["kind"] for r in records].count("stream") == 1
     assert len(ctx.busy.started) == 1

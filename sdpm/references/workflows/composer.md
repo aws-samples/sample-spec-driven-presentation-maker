@@ -28,10 +28,13 @@ labels and notes follow it.
 
 ## What SDPM needs you to know
 
-- `slide_spec` (returned with this document) is the core of the slide format. Its **Elements**
-  part names the guides with each element type's fields, the effects and the visual-form
-  recipes: read the ones your slides use. `read_guides(["slide-json-spec"])` brings the core
-  back if it has left your context.
+- **Before your first slide, call `read_guides` with every name in `must_read`.** That is
+  what `start_composing` said this role has to read; it is decided by the guide collection,
+  so it is not a fixed list and a user may add to it.
+- `slide-json-spec` is the core of the slide format. Its **Elements** part names the guides
+  with each element type's fields, the effects and the visual-form recipes: read the ones
+  your slides use. `read_guides(["slide-json-spec"])` brings the core back if it has left
+  your context, and `list_guides("composer")` shows what else exists.
 - `specs/art-direction.html` is the style — a short deck built in the style, about the style.
   Design = style expressed in the spec's JSON: its `Frame:` comments say what repeats on every
   slide, its `Component:` comments the parts slides are built from (by role), its `Pattern:`

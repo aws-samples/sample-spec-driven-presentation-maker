@@ -316,4 +316,5 @@ class TestStartupPreload:
         assert module.reference.bundled_styles()
         for role in ("orchestrator", "composer", "composer-html", "style"):
             assert entry._workflow(role)
-        assert entry._slide_spec()
+        from sdpm.knowledge.reference import BUNDLED_GUIDES_DIR
+        assert entry._guide_entries(BUNDLED_GUIDES_DIR)
