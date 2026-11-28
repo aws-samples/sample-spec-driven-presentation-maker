@@ -135,7 +135,7 @@ class FormattingMixin:
             opacity = elem.get("opacity")
             if opacity is not None and 0 <= opacity < 1:
                 self._set_fill_opacity(shape, opacity)
-        
+
         line_color = elem.get("line")
         line_width = elem.get("lineWidth", 1)
         line_gradient = elem.get("lineGradient")
@@ -321,21 +321,17 @@ class FormattingMixin:
                     if any('\u3000' <= ch <= '\u9fff' or '\uff00' <= ch <= '\uffef' for ch in line):
                         run._r.get_or_add_rPr().set('lang', 'ja-JP')
                     run.font.name = seg.get("fontName") or (None if no_default_font else font_name) or None
-                    # python-pptx only writes a:latin; CJK glyphs render with
-                    # a:ea, so an explicit font tag must set both or Japanese
-                    # text silently keeps the theme font.
-                    if seg.get("fontName"):
-                        from lxml import etree as _et_ea
-                        from pptx.oxml.ns import qn as _qn_ea
-                        rPr = run._r.get_or_add_rPr()
-                        ea = rPr.find(_qn_ea('a:ea'))
-                        if ea is None:
-                            ea = _et_ea.SubElement(rPr, _qn_ea('a:ea'))
-                            latin = rPr.find(_qn_ea('a:latin'))
-                            if latin is not None:
-                                rPr.remove(ea)
-                                rPr.insert(list(rPr).index(latin) + 1, ea)
-                        ea.set('typeface', seg["fontName"])
+                    # python-pptx writes only a:latin, which covers Latin
+                    # script alone — CJK glyphs resolve through a:ea. Name the
+                    # East Asian font on every run we font, or the deck's
+                    # fullwidth font is dropped for Japanese text (measured:
+                    # LibreOffice fell back to Noto Sans for a deck that asked
+                    # for Noto Serif JP) and a latin font without CJK glyphs
+                    # renders tofu. Runs whose font is inherited (placeholders,
+                    # imported lstStyle) keep theirs: name is None there.
+                    if run.font.name:
+                        self._set_east_asian_font(
+                            run, seg.get("fontName") or self.fonts.get("fullwidth"))
                     # Set sym font for symbol fonts (Wingdings etc)
                     actual_font = run.font.name
                     if actual_font and actual_font.startswith(('Wingdings', 'Symbol', 'Webdings')):
@@ -462,7 +458,31 @@ class FormattingMixin:
             lin.set('ang', str(_gradient_angle_to_ooxml(gradient.get("angle", 0))))
             lin.set('scaled', '0')
             rPr.insert(0, grad_fill)
-    
+
+    def _set_east_asian_font(self, run, typeface):
+        """Name the run's East Asian typeface (<a:ea>), beside <a:latin>.
+
+        PowerPoint picks the font per script: a:latin for Latin text, a:ea for
+        CJK. python-pptx writes only a:latin, so this must be set for Japanese
+        text to use the font the deck asked for.
+        """
+        if not typeface:
+            return
+        from lxml import etree
+        from pptx.oxml.ns import qn
+        rPr = run._r.get_or_add_rPr()
+        ea = rPr.find(qn('a:ea'))
+        if ea is None:
+            # CT_TextCharacterProperties is an ordered sequence: a:ea follows
+            # a:latin (and precedes a:cs / a:sym, which other styling adds).
+            ea = etree.Element(qn('a:ea'))
+            latin = rPr.find(qn('a:latin'))
+            if latin is not None:
+                latin.addnext(ea)
+            else:
+                rPr.append(ea)
+        ea.set('typeface', typeface)
+
     def _split_by_width(self, text, halfwidth_font=None):
         """Split text into runs by character width (fullwidth/halfwidth).
 
