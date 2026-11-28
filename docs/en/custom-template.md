@@ -302,6 +302,109 @@ touching the repository.
 
 ---
 
+### User-local guides
+
+Guides are the documents the roles read: the slide format, the design rules, how to pick
+a story line, what a finished slide owes. Yours join the same collection as the bundled
+ones, so you can add a guide of your own or replace a bundled one for yourself.
+
+Write to `<user-config>/guides/{name}.md` — i.e. `~/.config/sdpm/guides/` on macOS/Linux
+or `%APPDATA%/sdpm/guides/` on Windows:
+
+```bash
+mkdir -p ~/.config/sdpm/guides
+cat > ~/.config/sdpm/guides/house-style.md <<'EOF'
+---
+description: "Read when the deck is for an external audience — our wording rules"
+tags: [orchestrator, composer]
+always: true
+---
+
+# House style
+
+- Spell out a number's unit on first use.
+EOF
+```
+
+Search order (first match wins on same file name):
+
+1. Directories listed in `$SDPM_GUIDES_DIR` (platform path separator, like `PATH`)
+2. `<user-config>/guides/`
+3. `sdpm/references/guides/` (package-bundled)
+
+`list_guides` scans all three and returns them in one list. A guide of yours shadows the
+bundled guide of the same name, for you and for nobody else.
+
+On the AWS stack the same collection is served from `user-guides/{user}/` through
+`GET /guides`, `POST /guides/user`, `DELETE /guides/user/<name>` and
+`PATCH /guides/user/<name>`, and the Web UI writes there.
+
+#### The frontmatter
+
+The frontmatter is the contract. How it is read:
+
+- The block must open on the file's first line, as `---`, and close with `---`.
+- Keys are `key: value`, one per line. A nested key, an indented continuation or a
+  missing value makes the guide invalid.
+- **An unrecognised key is an error, not ignored.** If you have used a tool that skips
+  keys it does not know, this one does the opposite, so a typo is reported instead of
+  silently doing nothing.
+
+| Field | Required | Description |
+|---|---|---|
+| `description` | yes | What the guide decides, and when to read it. This is what a role matches against when choosing whether to read it, so it has to say both. At most 400 characters. |
+| `tags` | yes | Which roles can see the guide, as `[a, b]`. Closed vocabulary: `orchestrator`, `composer`, `composer-pptx`, `composer-html`, `style`, `translate`, `management`. A tag outside it makes the guide invalid. |
+| `always` | no (default `false`) | `true` names the guide in `must_read` for every role it is tagged for, so that role reads it before its first step. |
+
+A guide's text is capped at 24,000 bytes, because it has to arrive in one `read_guides`
+result. Past that budget the client files the result away and hands the model only its
+ends, so a guide nobody can read in one call would be accepted and then lost.
+
+#### When a role reads your guide
+
+`tags` decide who can see it; `always` decides whether they are handed it or have to ask.
+
+| `always` | Tagged for the role | What the role does |
+|---|---|---|
+| `true` | yes | Named in that role's `must_read`; the role reads it before its first step |
+| `false` | yes | Listed for that role, with your `description`; the role reads it when the description says to |
+| either | no | Not listed for that role at all. `tags` is the only thing that decides this |
+
+The roles and the tags they carry: orchestrator → `orchestrator`; PPTX composer →
+`composer`, `composer-pptx`; HTML composer → `composer`, `composer-html`; style → `style`;
+translate → `translate`. `management` is for guides about sdpm itself, which no role is
+handed automatically.
+
+#### When a guide is refused
+
+An invalid guide is never silently dropped. It is left out of the collection and reported
+in `list_guides` under `invalid`, as the file's path and the first thing wrong with it —
+one of `name`, `frontmatter`, `unknown-key`, `description`, `tags`, `tag-value`, `always`
+or `size`. A write through `POST /guides/user` is refused with the same cause.
+
+Shadowing a bundled guide is reported too, when it loses something. If you take the name
+of a guide a role was handed automatically and your version drops its `always` or one of
+its tags, `list_guides` says so under `warnings`: that role keeps being told to read the
+name and no longer receives what it asked for. Replacing a bundled guide with your own
+wording, keeping its `always` and tags, is the point of the feature and says nothing.
+
+#### If your guide is not being read
+
+1. Check `list_guides` for it. If it is under `invalid`, the cause is named there.
+2. If it is listed but the role never reads it, the `description` is doing the deciding.
+   Say when to read it, not only what it covers — "Read when the deck's language is
+   Japanese — …" rather than "Japanese writing".
+3. If the role should always read it, set `always: true`, and check it is tagged for that
+   role in the table above.
+4. If it should be read for one deck and not another, leave `always` off and put the
+   condition in the first clause of the `description`.
+
+The bundled `writing-a-guide` guide covers the rest: when one guide should become two,
+which tags to set, when `always` is justified, and how to bring in a document you already
+have. Read it with `read_guides(["writing-a-guide"])`.
+
+---
+
 ### Built-in Asset Sources
 
 spec-driven-presentation-maker includes download scripts for two icon sets:
