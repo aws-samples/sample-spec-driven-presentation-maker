@@ -108,6 +108,16 @@ class TestSave:
         result, status = call(api, api.save_user_guide, body=guide(text))
         assert status == 400 and "size" in result["error"]
 
+    @pytest.mark.parametrize("body", [["house-rules", "text"], "house-rules", 7])
+    def test_a_body_that_is_not_an_object_is_refused_not_a_server_error(self, api, body):
+        # A caller that sends the wrong shape gets told so. Reading name and text off a
+        # list raised AttributeError, which the handler returned as a 500.
+        before = dict(api.s3.buckets[BUCKET])
+        result, status = call(api, api.save_user_guide, body=body)
+        assert status == 400
+        assert "object" in result["error"]
+        assert api.s3.buckets[BUCKET] == before
+
     def test_a_write_replaces_the_previous_version(self, api):
         call(api, api.save_user_guide, body={"name": "mine", "text": VALID.decode().replace("Mine.", "Newer.")})
         assert b"Newer." in api.s3.buckets[BUCKET]["user-guides/u1/mine.md"]

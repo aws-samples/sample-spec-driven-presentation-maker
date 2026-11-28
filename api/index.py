@@ -580,6 +580,8 @@ def save_user_guide() -> Dict[str, Any]:
     Body: {"name": str, "text": str}
     """
     body = app.current_event.json_body
+    if not isinstance(body, dict):
+        return {"error": 'body must be an object: {"name": str, "text": str}'}, 400
     name = body.get("name", "")
     text = body.get("text", "")
 

@@ -374,29 +374,58 @@ def build_collection(sources: list[tuple[str, list[dict[str, str]]]]) -> dict[st
     valid entry of each name wins, so a user guide shadows the bundled guide of that name
     for listing, read-by-name and automatic hand-over alike.
 
-    Returns ``{"valid": {name: meta}, "invalid": [{"path", "category"}]}``. An invalid
-    entry never wins a name — resolution continues to the next source — and never fails
-    the call: the valid guides beside it are still listed, read and handed over.
+    Returns ``{"valid": {name: meta}, "invalid": [{"path", "category"}], "warnings":
+    [{"name", "warning"}]}``. An invalid entry never wins a name — resolution continues to
+    the next source — and never fails the call: the valid guides beside it are still
+    listed, read and handed over.
 
-    An entry whose name a previous group already won is not parsed: it is unreachable, so
-    reporting its metadata would only add noise a caller cannot act on.
+    An entry whose name a previous group already won is parsed only to compare: shadowing
+    is the one way to make a role lose a guide it was handed automatically, and a reader
+    who takes a bundled name without its ``always`` or its tags gets no error anywhere
+    else. What the shadowed guide no longer gives any role becomes a warning. Its own
+    metadata is not reported otherwise, and a shadowed entry that is itself invalid is
+    passed over: nothing can be said about what it would have given.
 
     Pure function. The caller supplies the groups, which is what lets the remote merge S3
     bodies and the local merge file reads through this same rule.
     """
     valid: dict[str, dict[str, Any]] = {}
     invalid: list[dict[str, str]] = []
+    warnings: list[dict[str, str]] = []
     for source, entries in sources:
         for entry in entries:
             name = entry["name"]
             if name in valid:
+                lost = _shadowing_loss(valid[name], guide_meta(name, entry["text"]), source)
+                if lost:
+                    warnings.append({"name": name, "warning": lost})
                 continue
             meta = guide_meta(name, entry["text"])
             if "category" in meta:
                 invalid.append({"path": entry["location"], "category": meta["category"]})
                 continue
             valid[name] = {**meta, "source": source}
-    return {"valid": valid, "invalid": invalid}
+    return {"valid": valid, "invalid": invalid, "warnings": warnings}
+
+
+def _shadowing_loss(winner: dict[str, Any], shadowed: dict[str, Any], shadowed_source: str) -> str:
+    """What no role gets any more because ``winner`` took ``shadowed``'s name, or "".
+
+    Only a loss is worth a warning. Taking the name of a guide to say the same thing
+    differently is the point of shadowing; dropping its ``always`` or one of its tags is
+    not, because the role that was handed it keeps asking and no longer receives it.
+    """
+    if "category" in shadowed:
+        return ""
+    losses = []
+    if shadowed["always"] and not winner["always"]:
+        losses.append("it was handed over automatically and yours is not (no always: true)")
+    missing = [tag for tag in shadowed["tags"] if tag not in winner["tags"]]
+    if missing:
+        losses.append(f"it was tagged {', '.join(missing)} and yours is not")
+    if not losses:
+        return ""
+    return f"shadows the {shadowed_source} guide of this name, but " + "; ".join(losses)
 
 
 #: What a listing shows about a guide. The body is deliberately absent: the listing rides
@@ -471,6 +500,8 @@ def guides_listing(collection: dict[str, Any], role: str = "") -> dict[str, Any]
     }
     if collection["invalid"]:
         payload["invalid"] = collection["invalid"]
+    if collection.get("warnings"):
+        payload["warnings"] = collection["warnings"]
     return payload
 
 

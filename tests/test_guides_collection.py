@@ -103,16 +103,74 @@ class TestMerge:
         assert collection["valid"]["grid"]["body"] == "First.\n"
 
     def test_a_shadowed_entry_is_not_reported_as_invalid(self) -> None:
-        # The bundled copy is unreachable, so its metadata is never parsed.
+        # The bundled copy is unreachable, so its own metadata is never reported — and a
+        # shadowed entry that does not parse says nothing about what it would have given.
         collection = build_collection([
             ("user", [valid_entry("grid")]),
             ("builtin", [entry("grid", "description: broken\ntags: [nope]")]),
         ])
         assert collection["invalid"] == []
+        assert collection["warnings"] == []
         assert collection["valid"]["grid"]["source"] == "user"
 
     def test_no_sources_is_an_empty_collection(self) -> None:
-        assert build_collection([]) == {"valid": {}, "invalid": []}
+        assert build_collection([]) == {"valid": {}, "invalid": [], "warnings": []}
+
+
+class TestShadowingAGuideARoleWasHanded:
+    """Shadowing is the one way a role loses a guide with no error anywhere.
+
+    Taking a bundled name to say the same thing differently is the point of the feature.
+    Taking it and dropping the ``always`` or a tag is not: the role keeps being told to
+    read that name and no longer receives what it asked for.
+    """
+
+    def test_losing_always_is_warned(self) -> None:
+        collection = build_collection([
+            ("user", [valid_entry("verify", body="Mine.\n")]),
+            ("builtin", [entry("verify", "description: Checks.\ntags: [composer]\nalways: true")]),
+        ])
+        assert collection["valid"]["verify"]["source"] == "user"
+        assert len(collection["warnings"]) == 1
+        warning = collection["warnings"][0]
+        assert warning["name"] == "verify"
+        assert "always: true" in warning["warning"]
+        assert "builtin" in warning["warning"]
+
+    def test_losing_a_tag_is_warned_with_the_tag_named(self) -> None:
+        collection = build_collection([
+            ("user", [valid_entry("writing-ja", tags="[composer]")]),
+            ("builtin", [valid_entry("writing-ja", tags="[orchestrator, composer]")]),
+        ])
+        assert collection["warnings"][0]["warning"].endswith("tagged orchestrator and yours is not")
+
+    def test_saying_the_same_thing_differently_is_not_warned(self) -> None:
+        collection = build_collection([
+            ("user", [entry("verify", "description: Mine.\ntags: [composer]\nalways: true")]),
+            ("builtin", [entry("verify", "description: Theirs.\ntags: [composer]\nalways: true")]),
+        ])
+        assert collection["warnings"] == []
+
+    def test_adding_to_what_it_gave_is_not_warned(self) -> None:
+        collection = build_collection([
+            ("user", [entry("grid", "description: Mine.\ntags: [composer, orchestrator]\nalways: true")]),
+            ("builtin", [valid_entry("grid", tags="[composer]")]),
+        ])
+        assert collection["warnings"] == []
+
+    def test_a_guide_that_shadows_nothing_is_not_warned(self) -> None:
+        collection = build_collection([("user", [valid_entry("mine")])])
+        assert collection["warnings"] == []
+
+    def test_the_warning_reaches_the_listing(self) -> None:
+        from sdpm.knowledge.reference import guides_listing
+
+        collection = build_collection([
+            ("user", [valid_entry("verify")]),
+            ("builtin", [entry("verify", "description: Checks.\ntags: [composer]\nalways: true")]),
+        ])
+        assert guides_listing(collection)["warnings"] == collection["warnings"]
+        assert "warnings" not in guides_listing(build_collection([("user", [valid_entry("mine")])]))
 
 
 class TestInvalidEntries:

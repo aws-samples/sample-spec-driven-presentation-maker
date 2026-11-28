@@ -43,7 +43,9 @@ def no_reads(monkeypatch: pytest.MonkeyPatch) -> None:
     def forbidden(*args, **kwargs):
         raise AssertionError("reopened a guide file after the preload")
 
-    monkeypatch.setattr(Path, "read_text", forbidden)
+    # Path.open rather than Path.read_text: the reader opens the file to bound how much
+    # of it it takes, and read_text goes through open as well, so this catches both.
+    monkeypatch.setattr(Path, "open", forbidden)
 
 
 class TestLocalProcessReadsEveryCall:
@@ -63,6 +65,33 @@ class TestLocalProcessReadsEveryCall:
         no_reads(monkeypatch)
         with pytest.raises(AssertionError):
             entry._guide_entries(BUNDLED_GUIDES_DIR)
+
+
+class TestTheReadIsBounded:
+    """The guides directory is the user's own, and every start_* walks it.
+
+    A stray file of any size can sit there, so the reader takes one character past the
+    cap: enough to reject it on size, and nothing is gained by holding the rest.
+    """
+
+    def test_a_file_past_the_cap_is_not_read_whole(self, uncached, user_dir) -> None:
+        from sdpm.knowledge.reference import GUIDE_MAX_BYTES
+
+        (user_dir / "huge.md").write_text(GUIDE.format(body="x" * (GUIDE_MAX_BYTES * 3)))
+        entries = {item["name"]: item["text"] for item in entry._guide_entries(user_dir)}
+        assert len(entries["huge"]) == GUIDE_MAX_BYTES + 1
+
+    def test_it_is_still_reported_on_size_and_not_handed_over(self, uncached, user_dir) -> None:
+        from sdpm.knowledge.reference import GUIDE_MAX_BYTES
+
+        (user_dir / "huge.md").write_text(GUIDE.format(body="x" * (GUIDE_MAX_BYTES * 3)))
+        collection = entry.guide_collection()
+        assert "huge" not in collection["valid"]
+        assert [item["category"] for item in collection["invalid"] if "huge" in item["path"]] == ["size"]
+
+    def test_a_guide_inside_the_cap_arrives_whole(self, uncached, user_dir) -> None:
+        (user_dir / "mine.md").write_text(GUIDE.format(body="All of it."))
+        assert entry.guide_collection()["valid"]["mine"]["body"] == "All of it.\n"
 
 
 class TestPreloadedProcessServesBundledFromMemory:

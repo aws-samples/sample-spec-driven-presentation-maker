@@ -80,7 +80,7 @@ def _guide_entries(directory: Path) -> list[dict[str, str]]:
         return cache[directory]
     entries = (
         [
-            {"name": path.stem, "location": str(path), "text": path.read_text(encoding="utf-8")}
+            {"name": path.stem, "location": str(path), "text": _guide_text(path)}
             for path in sorted(directory.glob("*.md"))
         ]
         if directory.is_dir()
@@ -89,6 +89,20 @@ def _guide_entries(directory: Path) -> list[dict[str, str]]:
     if cache is not None and directory == BUNDLED_GUIDES_DIR:
         cache[directory] = entries
     return entries
+
+
+def _guide_text(path: Path) -> str:
+    """One guide file's text, reading no more of it than deciding its fate can need.
+
+    The guides directory is the user's own, so a stray file of any size can sit in it and
+    every ``start_*`` walks the directory. One character past the cap is enough for
+    ``guide_meta`` to reject it on size, and the frontmatter it checks first is at the top
+    either way, so the reported cause is the same as reading the whole file would give.
+    """
+    from sdpm.knowledge.reference import GUIDE_MAX_BYTES
+
+    with path.open(encoding="utf-8") as handle:
+        return handle.read(GUIDE_MAX_BYTES + 1)
 
 
 def bundled_guide_entries() -> list[dict[str, str]]:
