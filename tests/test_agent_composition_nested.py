@@ -187,3 +187,75 @@ class TestAFailedOuterCallLeavesNothingStale:
         later = self.FlakyMCP(["verify"], fail_read=False)
         resolve_parts(parts, mcp_client=later, context={}, enable_cache=False, user_id="u1")
         assert next(args["names"] for name, args in later.calls if name == "read_guides") == ["verify"]
+
+
+class TestWhatTheBudgetShedStillReachesThisSurface:
+    """This surface keeps only ``guides_text``, so a note in a sibling key reaches nobody.
+
+    Before the read had a budget, the Agent got every mandatory guide whole. Now it gets
+    what fits, which is correct — but a model told to read a guide it never receives, with
+    nothing saying so, is the silence the budget work exists to end.
+    """
+
+    @staticmethod
+    def _collection_with_an_oversize_always_guide():
+        from sdpm.entry import bundled_guide_entries
+        from sdpm.knowledge.reference import build_collection
+
+        mine = {
+            "name": "house-rules",
+            "location": "/home/u/guides/house-rules.md",
+            "text": "---\ndescription: Ours.\ntags: [composer]\nalways: true\n---\n\n" + "x" * 13_400 + "\n",
+        }
+        return build_collection([("user", [mine]), ("builtin", bundled_guide_entries())])
+
+    class RealReadMCP(FakeMCP):
+        """``read_guides`` answers from the engine, so the note is the engine's own."""
+
+        def __init__(self, collection, must_read):
+            super().__init__(must_read=must_read)
+            self.collection = collection
+
+        def call_tool_sync(self, tool_use_id, name, arguments):
+            if name == "read_guides":
+                from sdpm.knowledge.reference import guides_result
+
+                self.calls.append((name, arguments))
+                payload = guides_result(self.collection, arguments["names"])
+                return {"status": "success", "content": [{"text": json.dumps(payload)}]}
+            return super().call_tool_sync(tool_use_id, name, arguments)
+
+    def _system_prompt(self):
+        from sdpm.entry import _ROLE_TAGS, guide_payload
+
+        collection = self._collection_with_an_oversize_always_guide()
+        must_read = guide_payload(collection, _ROLE_TAGS["composer-pptx"])["must_read"]
+        assert "house-rules" in must_read, "the fixture no longer exercises the case"
+        client = self.RealReadMCP(collection, must_read)
+        system, _ = resolve_parts(guide_parts(), mcp_client=client, context={}, enable_cache=False)
+        return system
+
+    def test_the_spec_still_arrives(self):
+        system = self._system_prompt()
+        assert "# Guide: slide-json-spec" in system
+        assert "# Guide: verify" in system
+
+    def test_the_prompt_says_which_guide_was_left_out(self):
+        system = self._system_prompt()
+        assert "house-rules" in system
+        assert "# Not included" in system
+
+    def test_the_prompt_says_what_to_do_about_it(self):
+        system = self._system_prompt()
+        assert "did not fit" in system
+        assert "read_guides again" in system
+
+    def test_a_set_that_fits_adds_no_such_note(self):
+        from sdpm.entry import bundled_guide_entries
+        from sdpm.knowledge.reference import build_collection
+
+        collection = build_collection([("builtin", bundled_guide_entries())])
+        client = self.RealReadMCP(collection, ["slide-json-spec", "verify"])
+        system, _ = resolve_parts(guide_parts(), mcp_client=client, context={}, enable_cache=False)
+        assert "# Not included" not in system
+        assert "did not fit" not in system

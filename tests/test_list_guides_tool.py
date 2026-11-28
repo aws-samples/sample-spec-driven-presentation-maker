@@ -153,6 +153,20 @@ class TestReadGuidesStaysInsideTheBudget:
         assert result["not_included"] == ["table"]
         assert "read_guides again" in result["note"]
 
+    def test_the_text_carries_the_note_too_for_a_caller_that_keeps_only_the_text(self) -> None:
+        # agent/modes picks guides_text and drops every sibling key, so a note living
+        # only in a key reaches that model as nothing at all.
+        text = contract.read_guides(["grid", "table", "verify"])["guides_text"]
+        assert "# Not included" in text
+        assert "table" in text.split("# Not included")[1]
+        assert "read_guides again" in text
+
+    def test_the_note_names_the_budget_as_the_docs_write_it(self) -> None:
+        from sdpm.knowledge.reference import GUIDE_RESULT_BUDGET
+
+        result = contract.read_guides(["grid", "table", "verify"])
+        assert f"{GUIDE_RESULT_BUDGET:,}-character budget" in result["note"]
+
     def test_the_spec_is_never_what_goes(self) -> None:
         # verify is bundled and always: a composer that loses it cannot check its own
         # slide, so the fill order keeps it and sheds the guide read on demand.

@@ -552,6 +552,8 @@ def _rejected_guide(name: str, text: str) -> Optional[Dict[str, Any]]:
     """
     from sdpm.knowledge.reference import guide_meta
 
+    if not isinstance(name, str) or not isinstance(text, str):
+        return {"error": "name and text must be strings"}
     if not text:
         return {"error": "text is required"}
     meta = guide_meta(name, text)

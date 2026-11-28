@@ -189,10 +189,15 @@ def guide_payload(collection: dict[str, Any], tags: set[str]) -> dict[str, Any]:
     """
     from sdpm.knowledge.reference import always_guides, select_guides
 
-    return {
-        "must_read": sorted(always_guides(collection, tags)),
-        "listing": {"guides": select_guides(collection, tags), "invalid": collection["invalid"]},
+    listing: dict[str, Any] = {
+        "guides": select_guides(collection, tags),
+        "invalid": collection["invalid"],
     }
+    # A lossy shadow is only ever reported in a listing, and list_guides is the call a
+    # role has no reason to make, so this listing has to carry it too.
+    if collection.get("warnings"):
+        listing["warnings"] = collection["warnings"]
+    return {"must_read": sorted(always_guides(collection, tags)), "listing": listing}
 
 
 # Orchestrator notes per deck format: the guide init_deck_workspace returns as

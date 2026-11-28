@@ -535,9 +535,14 @@ def guides_result(
 
     A result past the budget is filed away by the client, which hands the model the ends
     of a guide it was told to read and says nothing. So the result is filled to the budget
-    instead, in :func:`_spec_first` order, and whatever did not fit comes back by name
-    under ``not_included`` with a note telling the caller to ask for it separately. A
-    caller that can see what it is missing can act; a silently truncated one cannot.
+    instead, in :func:`_spec_first` order, and whatever did not fit is named. A caller
+    that can see what it is missing can act; a silently truncated one cannot.
+
+    What was left out is said **twice**: under ``not_included`` for a caller reading the
+    keys, and at the end of ``guides_text`` itself. A surface that composes a system prompt
+    keeps only the text (``agent/modes`` picks ``guides_text``), so a note living only in a
+    key would reach that model as nothing at all — the same silence this function exists to
+    end. Carrying it in the text means it travels wherever the text does.
 
     ``GUIDE_MAX_BYTES`` is derived from this budget, so one guide always fits and the
     fill never returns nothing. A guide whose JSON escaping alone crosses the budget is
@@ -550,14 +555,18 @@ def guides_result(
     ordered = sorted(bodies, key=lambda name: _spec_first(collection, name))
     kept = list(ordered)
     while True:
-        payload: dict[str, Any] = {"guides_text": join_guides({name: bodies[name] for name in kept})}
+        text = join_guides({name: bodies[name] for name in kept})
         left = ordered[len(kept):]
+        payload: dict[str, Any] = {}
         if left:
-            payload["not_included"] = left
-            payload["note"] = (
-                f"{len(left)} guide(s) did not fit this result's {budget}-character budget. "
-                "Call read_guides again with those names to read them."
+            note = (
+                f"{len(left)} guide(s) did not fit this result's {budget:,}-character budget: "
+                f"{', '.join(left)}. Call read_guides again with those names to read them."
             )
+            payload = {"guides_text": f"{text}\n# Not included\n\n{note}\n",
+                       "not_included": left, "note": note}
+        else:
+            payload = {"guides_text": text}
         if len(kept) <= 1 or len(json.dumps(payload, ensure_ascii=False)) <= budget:
             return payload
         kept.pop()

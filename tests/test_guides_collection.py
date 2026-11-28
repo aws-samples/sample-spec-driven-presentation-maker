@@ -172,6 +172,25 @@ class TestShadowingAGuideARoleWasHanded:
         assert guides_listing(collection)["warnings"] == collection["warnings"]
         assert "warnings" not in guides_listing(build_collection([("user", [valid_entry("mine")])]))
 
+    def test_the_warning_reaches_the_entry_payload_listing_as_well(self) -> None:
+        # list_guides carries it, but a role has no reason to call list_guides — the run
+        # that validated this design called it 0 times in 5 sessions. The listing a
+        # start_* already returns is where the warning is actually seen.
+        from sdpm.entry import guide_payload
+
+        collection = build_collection([
+            ("user", [valid_entry("verify")]),
+            ("builtin", [entry("verify", "description: Checks.\ntags: [composer]\nalways: true")]),
+        ])
+        listing = guide_payload(collection, {"composer"})["listing"]
+        assert listing["warnings"] == collection["warnings"]
+
+    def test_a_clean_collection_adds_no_warnings_key_to_the_entry_payload(self) -> None:
+        from sdpm.entry import guide_payload
+
+        collection = build_collection([("user", [valid_entry("mine")])])
+        assert "warnings" not in guide_payload(collection, {"composer"})["listing"]
+
 
 class TestInvalidEntries:
     """REQ-2.6 from a user-store entry: reported, never silently degraded."""

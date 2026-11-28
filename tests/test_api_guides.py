@@ -118,6 +118,20 @@ class TestSave:
         assert "object" in result["error"]
         assert api.s3.buckets[BUCKET] == before
 
+    @pytest.mark.parametrize("field,value", [
+        ("text", 123), ("text", ["---\n"]), ("text", {"a": 1}),
+        ("name", 123), ("name", ["house-rules"]),
+    ])
+    def test_a_field_of_the_wrong_type_is_refused_not_a_server_error(self, api, field, value):
+        # The object check alone was not enough: guide_meta works on the text, so a
+        # non-string reached it and raised ('int' object has no attribute 'splitlines').
+        before = dict(api.s3.buckets[BUCKET])
+        body = {"name": "house-rules", "text": VALID.decode()} | {field: value}
+        result, status = call(api, api.save_user_guide, body=body)
+        assert status == 400
+        assert "strings" in result["error"]
+        assert api.s3.buckets[BUCKET] == before
+
     def test_a_write_replaces_the_previous_version(self, api):
         call(api, api.save_user_guide, body={"name": "mine", "text": VALID.decode().replace("Mine.", "Newer.")})
         assert b"Newer." in api.s3.buckets[BUCKET]["user-guides/u1/mine.md"]
