@@ -6,6 +6,7 @@ Reference data is used to guide AI-generated slide content.
 See docs/internal/DATASET_COMPLIANCE.md for dataset provenance.
 
 Reference: unified access to design patterns, components, schemas, rules, and reviews."""
+import json
 import re
 from collections.abc import Iterable
 from pathlib import Path, PureWindowsPath
@@ -208,9 +209,18 @@ TAGS = (
     "management",
 )
 
-#: Cap on one guide's text. A guide's body lands in a system prompt, so an unbounded
-#: guide inflates every prompt on that surface. Well above every bundled guide.
-GUIDE_MAX_BYTES = 64 * 1024
+#: Cap on one ``read_guides`` result. Kiro CLI V3 moves a tool result of 30,000+
+#: characters to a file and shows the model only its ends; Claude Code caps MCP output
+#: too. 25,000 leaves room for a larger group. ``tests/test_entry_tools.py`` measures
+#: every surface's entry payload against this same number.
+GUIDE_RESULT_BUDGET = 25_000
+
+#: Cap on one guide's text, derived from the budget rather than chosen: a guide nobody
+#: can read in one call would be reported as valid and then arrive truncated. The 1,000
+#: covers the JSON framing and the heading (measured: 513 for the largest bundled guide).
+#: UTF-8 bytes are never fewer than characters, so a byte cap bounds the character count.
+#: The largest bundled guide is 22,375 bytes.
+GUIDE_MAX_BYTES = GUIDE_RESULT_BUDGET - 1_000
 
 #: Cap on one guide's description and on a guide name. Every description rides in every
 #: listing, and a listing rides in every ``start_*`` return, so an unbounded description
@@ -471,6 +481,55 @@ def join_guides(guides: dict[str, str]) -> str:
     normalised to one trailing newline, so a prompt built from it is reproducible.
     """
     return "\n".join(f"# Guide: {name}\n\n{guides[name].rstrip()}\n" for name in sorted(guides))
+
+
+def _spec_first(collection: dict[str, Any], name: str) -> tuple[bool, str]:
+    """Sort key putting the guides a role cannot work without at the front.
+
+    A bundled guide claiming ``always`` is the format spec and the checks — a composer
+    that loses ``slide-json-spec`` cannot produce a valid slide at all, while a guide of
+    the user's own carries a preference. So when a result has to shed something, this
+    order decides what, and the spec is never what goes.
+    """
+    meta = collection["valid"][name]
+    return (not (meta["always"] and meta["source"] != "user"), name)
+
+
+def guides_result(
+    collection: dict[str, Any],
+    names: Iterable[str],
+    budget: int = GUIDE_RESULT_BUDGET,
+) -> dict[str, Any]:
+    """The ``read_guides`` payload: the guides that fit one result, and what did not.
+
+    A result past the budget is filed away by the client, which hands the model the ends
+    of a guide it was told to read and says nothing. So the result is filled to the budget
+    instead, in :func:`_spec_first` order, and whatever did not fit comes back by name
+    under ``not_included`` with a note telling the caller to ask for it separately. A
+    caller that can see what it is missing can act; a silently truncated one cannot.
+
+    ``GUIDE_MAX_BYTES`` is derived from this budget, so one guide always fits and the
+    fill never returns nothing. A guide whose JSON escaping alone crosses the budget is
+    still returned, with the note naming it — being told is better than being cut.
+
+    Every guide surface routes its read through here, so one rule covers the local tools,
+    the CLI and the remote server rather than three.
+    """
+    bodies = guides_by_name(collection, names)
+    ordered = sorted(bodies, key=lambda name: _spec_first(collection, name))
+    kept = list(ordered)
+    while True:
+        payload: dict[str, Any] = {"guides_text": join_guides({name: bodies[name] for name in kept})}
+        left = ordered[len(kept):]
+        if left:
+            payload["not_included"] = left
+            payload["note"] = (
+                f"{len(left)} guide(s) did not fit this result's {budget}-character budget. "
+                "Call read_guides again with those names to read them."
+            )
+        if len(kept) <= 1 or len(json.dumps(payload, ensure_ascii=False)) <= budget:
+            return payload
+        kept.pop()
 
 
 def list_category(category_dir: Path) -> list[dict[str, str]]:

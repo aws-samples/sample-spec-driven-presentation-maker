@@ -290,9 +290,9 @@ def read_guides(
     its first step) or from list_guides.
     """
     from sdpm.entry import guide_collection
-    from sdpm.knowledge.reference import guides_by_name, join_guides
+    from sdpm.knowledge.reference import guides_result
 
-    return {"guides_text": join_guides(guides_by_name(guide_collection(), names))}
+    return guides_result(guide_collection(), names)
 
 
 def code_to_slide(

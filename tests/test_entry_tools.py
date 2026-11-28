@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from sdpm import tools
+from sdpm.knowledge.reference import GUIDE_RESULT_BUDGET
 
 _OUTLINE = """# Deck
 
@@ -483,9 +484,7 @@ def test_apply_style_returns_a_line_numbered_toc(tmp_path: Path):
 # Size budget: the start_composing result reaches the composer inline
 # ---------------------------------------------------------------------------
 
-# Kiro CLI V3 moves a tool result of 30,000+ characters to a file and shows the model
-# only its ends; Claude Code caps MCP output too. 25,000 leaves room for larger groups.
-_RESULT_BUDGET = 25_000
+_RESULT_BUDGET = GUIDE_RESULT_BUDGET
 
 _BUDGET_OUTLINE = """# Deck
 

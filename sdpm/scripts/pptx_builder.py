@@ -412,14 +412,18 @@ def cmd_list_guides(args):
 def cmd_guides(args):
     """Show guides by name, from the same collection the MCP tools read."""
     from sdpm.entry import guide_collection
-    from sdpm.knowledge.reference import guides_by_name, join_guides
+    from sdpm.knowledge.reference import guides_result
     if not args.names:
         cmd_list_guides(args)
         return
     try:
-        print(join_guides(guides_by_name(guide_collection(), args.names)))
+        result = guides_result(guide_collection(), args.names)
     except FileNotFoundError as e:
         print(f"# {e}", file=sys.stderr)
+        return
+    print(result["guides_text"])
+    if "not_included" in result:
+        print(f"\n# {result['note']} Not included: {', '.join(result['not_included'])}", file=sys.stderr)
 
 
 def cmd_init(args):

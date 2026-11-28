@@ -13,6 +13,7 @@ import pytest
 from sdpm.knowledge.reference import (
     BUNDLED_GUIDES_DIR,
     GUIDE_MAX_BYTES,
+    GUIDE_RESULT_BUDGET,
     TAGS,
     guide_meta,
     is_guide_name,
@@ -40,8 +41,19 @@ class TestVocabulary:
         assert BUNDLED_GUIDES_DIR.name == "guides"
         assert BUNDLED_GUIDES_DIR.is_dir()
 
-    def test_cap_is_64_kib(self):
-        assert GUIDE_MAX_BYTES == 64 * 1024
+    def test_the_cap_is_derived_from_the_result_budget(self):
+        # A guide no single read can carry would be reported valid and then arrive
+        # truncated, so the cap is the budget minus the framing, not a round number.
+        assert GUIDE_MAX_BYTES == GUIDE_RESULT_BUDGET - 1_000
+        assert GUIDE_MAX_BYTES < GUIDE_RESULT_BUDGET
+
+    def test_every_bundled_guide_fits_the_cap(self):
+        over = {
+            path.stem: len(path.read_bytes())
+            for path in BUNDLED_GUIDES_DIR.glob("*.md")
+            if len(path.read_bytes()) > GUIDE_MAX_BYTES
+        }
+        assert over == {}
 
 
 class TestGuideName:

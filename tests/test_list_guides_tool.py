@@ -95,11 +95,12 @@ class TestReadGuidesTool:
         assert result["guides_text"].startswith("# Guide: grid\n\n")
 
     def test_several_names_come_back_in_ascending_order(self) -> None:
-        text = contract.read_guides(["verify", "grid", "table"])["guides_text"]
-        assert [line for line in text.splitlines() if line.startswith("# Guide: ")] == [
-            "# Guide: grid",
-            "# Guide: table",
-            "# Guide: verify",
+        result = contract.read_guides(["writing-ja", "aws-design", "html-deck"])
+        assert set(result) == {"guides_text"}  # all three fit, so nothing is reported
+        assert [line for line in result["guides_text"].splitlines() if line.startswith("# Guide: ")] == [
+            "# Guide: aws-design",
+            "# Guide: html-deck",
+            "# Guide: writing-ja",
         ]
 
     def test_two_calls_are_byte_identical(self) -> None:
@@ -125,13 +126,47 @@ class TestReadGuidesTool:
 
     def test_the_budget_holds_for_the_biggest_mandatory_set(self) -> None:
         from sdpm.entry import _ROLE_TAGS, guide_collection
-        from sdpm.knowledge.reference import always_guides
+        from sdpm.knowledge.reference import GUIDE_RESULT_BUDGET, always_guides
 
         collection = guide_collection()
         for role, tags in _ROLE_TAGS.items():
             names = sorted(always_guides(collection, tags))
             size = len(json.dumps(contract.read_guides(names), ensure_ascii=False)) if names else 0
-            assert size <= 25_000, (role, size)
+            assert size <= GUIDE_RESULT_BUDGET, (role, size)
+
+
+class TestReadGuidesStaysInsideTheBudget:
+    """A result past the budget is filed away by the client and the model sees its ends.
+
+    So the read fills to the budget and says what it left, instead of handing over a set
+    nobody can read. Both halves matter: the result fits, and the caller is told.
+    """
+
+    def test_a_set_over_the_budget_comes_back_inside_it(self) -> None:
+        from sdpm.knowledge.reference import GUIDE_RESULT_BUDGET
+
+        result = contract.read_guides(["grid", "table", "verify"])
+        assert len(json.dumps(result, ensure_ascii=False)) <= GUIDE_RESULT_BUDGET
+
+    def test_what_did_not_fit_comes_back_by_name_with_what_to_do(self) -> None:
+        result = contract.read_guides(["grid", "table", "verify"])
+        assert result["not_included"] == ["table"]
+        assert "read_guides again" in result["note"]
+
+    def test_the_spec_is_never_what_goes(self) -> None:
+        # verify is bundled and always: a composer that loses it cannot check its own
+        # slide, so the fill order keeps it and sheds the guide read on demand.
+        result = contract.read_guides(["grid", "table", "verify"])
+        assert "# Guide: verify" in result["guides_text"]
+
+    def test_a_set_that_fits_reports_nothing(self) -> None:
+        result = contract.read_guides(["aws-design", "html-deck"])
+        assert set(result) == {"guides_text"}
+
+    def test_the_fill_is_stable_across_calls(self) -> None:
+        first = contract.read_guides(["grid", "table", "verify"])
+        second = contract.read_guides(["grid", "table", "verify"])
+        assert first == second
 
 
 class TestShadowing:

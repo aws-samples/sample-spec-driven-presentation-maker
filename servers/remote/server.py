@@ -1007,10 +1007,9 @@ def read_guides(
     The names come from a start_* call's must_read (the guides that role must read before
     its first step) or from list_guides.
     """
-    from sdpm.knowledge.reference import guides_by_name, join_guides
+    from sdpm.knowledge.reference import guides_result
 
-    bodies = guides_by_name(_guide_collection(_get_user_id()), names)
-    return json.dumps({"guides_text": join_guides(bodies)}, ensure_ascii=False)
+    return json.dumps(guides_result(_guide_collection(_get_user_id()), names), ensure_ascii=False)
 
 # User-invoked entry points (slash commands / prompt menu): vibe, spec, style, translate
 from sdpm.tools import prompts as _prompts  # noqa: E402
