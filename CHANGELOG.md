@@ -29,9 +29,16 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   `translate`, `management`), and a guide with `always: true` is named in its roles'
   `must_read`, so one of your own guides can be mandatory. An invalid guide is reported in the
   listing with the reason, never silently dropped; a write is refused with the reason named.
+  Taking a bundled guide's name and dropping its `always` or one of its tags is reported
+  under `warnings`, because that role keeps being told to read the name and no longer
+  receives what it asked for. One guide's text is capped at 24,000 bytes, derived from the
+  25,000-character tool-result budget so a guide that validates fits one `read_guides`
+  call; a read of several fills to that budget and names what did not fit rather than
+  letting the client file the result away and hand the model its ends.
   New `verify` guide (the rules a slide owes whatever its style says, mandatory for both
   composer modes) and `writing-a-guide` (how to write one). `specs/outline.md` now opens with
-  why that structure was chosen. Local mode and the AWS stack.
+  why that structure was chosen. Documented in `docs/en/custom-template.md` beside user
+  styles and templates. Local mode and the AWS stack.
 
 - **Speaker notes destination** (`deck.json` `"speakerNotes"`, #666). `"pptx"` (the
   default, unchanged behaviour) writes each slide's `notes` as speaker notes; `"markdown"`
