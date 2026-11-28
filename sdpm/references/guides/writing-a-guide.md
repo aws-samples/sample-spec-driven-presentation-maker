@@ -33,7 +33,9 @@ always: false
 a fourth key, a comment, an indented sub-key or a missing value makes the guide invalid, and
 an invalid guide is reported in the listing instead of being handed over. That is deliberate:
 a guide that fails to parse would otherwise disappear silently from every role that needed
-it. A single guide's text is capped at 64 KiB, because its body goes into a system prompt.
+it. A single guide's text is capped at 24,000 bytes, because a guide has to arrive in one
+`read_guides` result: past that budget the client files the result away and hands the model
+only its ends, so a guide nobody can read in one call would be accepted and then lost.
 
 ## When one guide should become two
 
@@ -50,6 +52,13 @@ for the first.
 
 The test is the reader, not the length. A 300-line guide read in one moment is one guide;
 40 lines read in two unrelated moments are two.
+
+If you came from a tool where a long document is split into an index and its parts, that
+does not work here: a guide is handed over whole, so two files mean two reads rather than
+a cheap first read. Length is a reason to **cut**, not to split. A guide over the cap is
+carrying more than its reader needs — take out what the reader would not act on. If it
+turns out the overflow is read at a different moment, the test above was already telling
+you to split it, and the cap only made you notice.
 
 ## Which tags to set
 

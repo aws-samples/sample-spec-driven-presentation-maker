@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from sdpm.knowledge.reference import TAGS, guide_meta, is_guide_name
+from sdpm.knowledge.reference import GUIDE_MAX_BYTES, TAGS, guide_meta, is_guide_name
 
 GUIDES_DIR = Path(__file__).parents[1] / "sdpm" / "references" / "guides"
 
@@ -322,7 +322,21 @@ class TestWritingAGuide:
         text = body("writing-a-guide")
         for key in ("description", "tags", "always"):
             assert key in text
-        assert "64 KiB" in text
+        assert f"{GUIDE_MAX_BYTES:,} bytes" in text
+
+    def test_the_cap_is_explained_by_the_one_read_it_has_to_fit(self) -> None:
+        # The old reason ("its body goes into a system prompt") does not explain the
+        # number: the composing surfaces have no result limit. The read does.
+        text = body("writing-a-guide")
+        assert "one\n`read_guides` result" in text or "one `read_guides` result" in text
+        assert "system prompt" not in text.split("## When one guide should become two")[0]
+
+    def test_length_sends_the_author_back_to_the_reader_test(self) -> None:
+        # Cursor and Claude Code both answer length with "split"; both have a cheap first
+        # read this does not. An author arriving from either needs the difference said.
+        section = body("writing-a-guide").split("## When one guide should become two")[1]
+        assert "handed over whole" in section
+        assert "reason to **cut**, not to split" in section
 
     def test_every_tag_in_the_vocabulary_is_explained(self) -> None:
         text = body("writing-a-guide")
